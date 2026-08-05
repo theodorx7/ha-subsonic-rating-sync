@@ -1,1 +1,17 @@
 
+#!/usr/bin/env bashio
+set -e
+
+# Чтение опций из HA
+NAVIDROME_URL=$(bashio::config 'navidrome_url')
+NAVIDROME_USER=$(bashio::config 'navidrome_user')
+NAVIDROME_PASS=$(bashio::config 'navidrome_password')
+MUSIC_FOLDER=$(bashio::config 'music_folder')
+SYNC_INTERVAL=$(bashio::config 'sync_interval_minutes')
+CONFLICT_RES=$(bashio::config 'conflict_resolution')
+DRY_RUN=$(bashio::config 'dry_run')
+
+export NAVIDROME_URL NAVIDROME_USER NAVIDROME_PASS MUSIC_FOLDER SYNC_INTERVAL CONFLICT_RES DRY_RUN
+
+echo "Starting Navidrome StarSync Add-on..."
+exec python -m src
