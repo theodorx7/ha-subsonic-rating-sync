@@ -12,17 +12,17 @@ class SyncAgent:
         self.config = config
 
         # Убираем возможный слэш в конце хоста, чтобы избежать // в URL
-        host = config['navidrome_host'].rstrip('/')
-        protocol = config['navidrome_protocol']
+        host = config['server_host'].rstrip('/')
+        protocol = config['server_protocol']
         
         # Формируем base_url вида http://localhost или https://navidrome.example.com
         base_url = f"{protocol}://{host}"
 
         self.conn = libopensonic.Connection(
             base_url=base_url,
-            username=config['navidrome_user'],
-            password=config['navidrome_password'],
-            port=config['navidrome_port'],
+            username=config['user'],
+            password=config['password'],
+            port=config['server_port'],
         )
         logger.info("Подключение к Navidrome установлено.")
 
