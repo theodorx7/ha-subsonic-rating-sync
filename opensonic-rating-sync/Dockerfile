@@ -4,8 +4,10 @@ FROM ghcr.io/home-assistant/base:latest
 RUN apk add --no-cache python3 py3-pip
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir 
+  - py-opensonic==10.2.1
+  - mutagen==1.48.1
+  - filelock==3.32.2
 
 # Копируем пакет Python (вложенная папка) и run-скрипт
 COPY opensonic_rating_sync/ ./opensonic_rating_sync/
