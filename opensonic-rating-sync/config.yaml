@@ -16,9 +16,9 @@ map:
   - share:rw
 
 options:
-  protocol: "https"
-  host: "localhost"
-  port: 4533
+  server_protocol: "https"
+  server_host: "localhost"
+  server_port: 4533
   user: "fedor"
   password: ""
   music_folder: "/media/MUSIC/test"
@@ -28,9 +28,9 @@ options:
   debug: true
 
 schema:
-  protocol: list(https|http)
-  host: str
-  port: int
+  server_protocol: list(https|http)
+  server_host: str
+  server_port: int
   user: str
   password: password
   music_folder: str
