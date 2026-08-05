@@ -1,3 +1,4 @@
+# Home Assistant App: Syncing rating/favorite/like tags between audio files and Navidrome — Subsonic/Opensonic API
 # Home Assistant App: Example app
 
 _Example app to use as a blueprint for new apps._
