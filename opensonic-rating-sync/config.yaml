@@ -16,11 +16,11 @@ map:
   - share:rw
 
 options:
-  navidrome_protocol: "https"
-  navidrome_host: "localhost"
-  navidrome_port: 4533
-  navidrome_user: "fedor"
-  navidrome_password: ""
+  protocol: "https"
+  host: "localhost"
+  port: 4533
+  user: "fedor"
+  password: ""
   music_folder: "/media/MUSIC/test"
   sync_interval_minutes: 60
   conflict_resolution: "server_wins"
@@ -28,11 +28,11 @@ options:
   debug: true
 
 schema:
-  navidrome_protocol: list(https|http)
-  navidrome_host: str
-  navidrome_port: int
-  navidrome_user: str
-  navidrome_password: password
+  protocol: list(https|http)
+  host: str
+  port: int
+  user: str
+  password: password
   music_folder: str
   sync_interval_minutes: int
   conflict_resolution: match(^(server_wins|file_wins)$)
