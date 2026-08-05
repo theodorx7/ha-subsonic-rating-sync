@@ -11,12 +11,17 @@ class SyncAgent:
     def __init__(self, config):
         self.config = config
 
-        # Убираем возможный слэш в конце хоста, чтобы избежать // в URL
-        host = config['server_host'].rstrip('/')
-        protocol = config['server_protocol']
-        
-        # Формируем base_url вида http://localhost или https://navidrome.example.com
-        base_url = f"{protocol}://{host}"
+        # Надежная очистка хоста: берем только доменное имя, отбрасываем протокол, порт и слэши
+        host_raw = config['navidrome_host'].strip()
+        # Удаляем http:// или https:// если пользователь их ввел
+        host = re.sub(r'^https?://', '', host_raw, flags=re.IGNORECASE)
+        # Удаляем всё после слэша (пути), если они есть
+        host = host.split('/')[0]
+        # Удаляем порт, если пользователь его зачем-то написал в поле host (например, host:4533)
+        host = host.split(':')[0]
+
+        # Склеиваем протокол из выпадающего списка и очищенный хост
+        base_url = f"{config['navidrome_protocol']}://{host}"
 
         self.conn = libopensonic.Connection(
             base_url=base_url,
