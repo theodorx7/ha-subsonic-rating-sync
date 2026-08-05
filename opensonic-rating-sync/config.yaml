@@ -9,6 +9,7 @@ arch:
 startup: application
 boot: auto
 init: false
+apparmor: false
 map:
   - media:rw
   - share:rw
