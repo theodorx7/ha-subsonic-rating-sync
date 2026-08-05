@@ -1,8 +1,0 @@
-build_from:
-  aarch64: ghcr.io/home-assistant/aarch64-base:3.23
-  amd64: ghcr.io/home-assistant/amd64-base:3.23
-
-labels:
-  org.opencontainers.image.title: "Home Assistant App: Navidrome/Subsonic Rating Sync"
-  org.opencontainers.image.description: "Syncing rating/favorite/like tags between audio files and Navidrome (Subsonic/Opensonic API). Supported sync modes: two-way, one-way (Files → Navidrome), or (Navidrome → Files)."
-  org.opencontainers.image.source: "https://github.com/theodorx7/ha-subsonic-rating-sync"
