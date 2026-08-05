@@ -12,7 +12,7 @@ def main():
         'navidrome_user': os.environ.get('NAVIDROME_USER'),
         'navidrome_password': os.environ.get('NAVIDROME_PASS'),
         'music_folder': os.environ.get('MUSIC_FOLDER', '/music'),
-        'sync_interval_minutes': int(os.environ.get('SYNC_INTERVAL', 60)),
+        'sync_interval_minutes': int(os.environ.get('SYNC_INTERVAL') or 60),
         'conflict_resolution': os.environ.get('CONFLICT_RES', 'server_wins'),
         'dry_run': os.environ.get('DRY_RUN', 'false').lower() == 'true'
     }
