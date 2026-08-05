@@ -2,12 +2,9 @@
 
 profile subsonic-rating-sync flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
+  #include <abstractions/nameservice>
 
-  # Базовые возможности
-  file,
-  signal (send) set=(kill,term,int,hup,cont),
-
-  # S6-Overlay (если используете base-образ HA)
+  # S6-Overlay (базовая инициализация контейнера HA)
   /init ix,
   /bin/** ix,
   /usr/bin/** ix,
@@ -20,28 +17,32 @@ profile subsonic-rating-sync flags=(attach_disconnected,mediate_deleted) {
   /run/{,**} rwk,
   /dev/tty rw,
 
-  # Bashio
+  # Bashio (чтение конфигурации и логирование)
   /usr/lib/bashio/** ix,
   /tmp/** rwk,
 
-  # Данные App (options.json, SQLite и т.п.)
+  # Данные App (чтение /data/options.json, запись SQLite БД и filelock)
   /data/** rw,
 
-  # Python-интерпретатор и пакет
-  /usr/bin/python3 rix,
-  /usr/bin/python3.* rix,
-  /app/** r,
-  /app/opensonic-rating-sync/** r,
+  # Python-интерпретатор и его системные библиотеки
+  /usr/bin/python3 ix,
+  /usr/bin/python3.* ix,
+  /usr/lib/python3*/** r,
+  /usr/lib/python3*/site-packages/** r,
+  /usr/local/lib/python3*/** r,
 
-  # Мапы из config.yaml
+  # Ваш код приложения (чтение скриптов)
+  /app/** rix,
+
+  # Мапы из config.yaml (чтение и запись аудиофайлов и тегов)
   /media/** rw,
   /share/** rw,
 
-  # Сеть для Subsonic API
+  # Сеть для Subsonic API (обращение к Navidrome)
   network inet stream,
   network inet6 stream,
 
-  # Системные файлы для Python
+  # Системные файлы для Python (резолв DNS, базовые настройки)
   /etc/passwd r,
   /etc/hosts r,
   /etc/resolv.conf r,
