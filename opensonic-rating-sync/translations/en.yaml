@@ -1,5 +1,25 @@
 configuration:
-  option:
-    name: Name option
-    description: >-
-       The message that will be printed to the log when starting this example app.
+  navidrome_url:
+    name: Navidrome URL
+    description: Базовый URL вашего Navidrome/Subsonic сервера.
+  navidrome_user:
+    name: Navidrome user
+    description: Имя пользователя для API-доступа.
+  navidrome_password:
+    name: Navidrome password
+    description: Пароль пользователя.
+  music_folder:
+    name: Music folder
+    description: Путь к папке с музыкой внутри контейнера (обычно /media/...).
+  sync_interval_minutes:
+    name: Sync interval (minutes)
+    description: Периодичность синхронизации.
+  conflict_resolution:
+    name: Conflict resolution
+    description: Стратегия разрешения конфликтов при двусторонней синхронизации.
+  dry_run:
+    name: Dry run
+    description: Только имитация без записи изменений.
+  debug:
+    name: Debug
+    description: Подробное логирование.
