@@ -2,11 +2,11 @@ configuration:
   server_protocol:
     name: Server protocol
     description: Базовый URL вашего Navidrome/Subsonic сервера.
+  server_host:
+    name: Server URL
+    description: Базовый URL вашего Navidrome/Subsonic сервера.
   server_port:
     name: Server port
-    description: Базовый URL вашего Navidrome/Subsonic сервера.
-  server_url:
-    name: Server URL
     description: Базовый URL вашего Navidrome/Subsonic сервера.
   user:
     name: User
