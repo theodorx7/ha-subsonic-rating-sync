@@ -12,7 +12,7 @@ boot: auto
 map:
   - share:rw
 options:
-  navidrome_url: "https://musicfx.duckdns.org:4533/"
+  navidrome_url: ""
   navidrome_user: "fedor"
   navidrome_password: ""
   music_folder: "/media/MUSIC/test"
