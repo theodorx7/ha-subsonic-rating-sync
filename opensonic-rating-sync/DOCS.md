@@ -1,10 +1,6 @@
-# Home Assistant App: Example app
+# Home Assistant App: Syncing rating/favorite/like tags between audio files and Navidrome — Subsonic/Opensonic API
 
-## How to use
+## The app is under active development and currently non-functional. Keep an eye out for updates on the full public release.
 
-This app really does nothing. It is just an example.
 
-When started it will print the configured message or "Hello world" in the log.
 
-It will also print "All done!" in `/share/example_app_output.txt` to show
-simple example of the usage of `map` in app config.
