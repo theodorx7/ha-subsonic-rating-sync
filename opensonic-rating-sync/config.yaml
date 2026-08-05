@@ -21,6 +21,7 @@ options:
   server_port: 4533
   user: "fedor"
   password: ""
+  api_key: ""
   music_folder_id: "1"
   music_folder: "/media/MUSIC"
   sync_interval_minutes: 60
@@ -34,6 +35,7 @@ schema:
   server_port: int
   user: str
   password: password
+  api_key: password
   music_folder_id: str
   music_folder: str
   sync_interval_minutes: int
