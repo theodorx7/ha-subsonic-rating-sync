@@ -4,7 +4,6 @@ from .locker import get_file_lock
 from .database import get_track_state, upsert_track_state
 from . import ratings
 import libopensonic
-from urllib.parse import urlparse
 
 logger = setup_logger()
 
@@ -12,15 +11,18 @@ class SyncAgent:
     def __init__(self, config):
         self.config = config
 
-        parsed = urlparse(config['navidrome_url'])
-        host = parsed.hostname or config['navidrome_url']
-        port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+        # Убираем возможный слэш в конце хоста, чтобы избежать // в URL
+        host = config['navidrome_host'].rstrip('/')
+        protocol = config['navidrome_protocol']
+        
+        # Формируем base_url вида http://localhost или https://navidrome.example.com
+        base_url = f"{protocol}://{host}"
 
         self.conn = libopensonic.Connection(
-            base_url=host,
-            username=config['navidrome_user'],       # ← исправлено
-            password=config['navidrome_password'],   # ← исправлено
-            port=port,
+            base_url=base_url,
+            username=config['navidrome_user'],
+            password=config['navidrome_password'],
+            port=config['navidrome_port'],
         )
         logger.info("Подключение к Navidrome установлено.")
 
