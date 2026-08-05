@@ -16,11 +16,10 @@ class SyncAgent:
             port = int(config['navidrome_url'].split(":")[-1])
             
         self.conn = libopensonic.Connection(
-            baseUrl=config['navidrome_url'],
-            username=config['navidrome_user'],
-            password=config['navidrome_password'],
-            appName="HA-StarSync",
-            port=port
+            base_url=config['navidrome_url'],
+            username=config['username'],
+            password=config['password'],
+            port=port,
         )
         logger.info("Подключение к Navidrome установлено.")
 
