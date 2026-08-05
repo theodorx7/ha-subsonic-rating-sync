@@ -1,9 +1,8 @@
 import logging
 from mutagen import File as MutagenFile
-from mutagen.aiff import AIFF
 from mutagen.id3 import ID3, POPM, TXXX
 from mutagen.mp3 import MP3
-from mutagen.mp4 import MP4
+from mutagen.mp4 import MP4, MP4Tags
 
 logger = logging.getLogger(__name__)
 
