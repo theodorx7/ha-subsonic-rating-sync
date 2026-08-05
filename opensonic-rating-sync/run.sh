@@ -6,7 +6,9 @@ bashio::log.info "Starting Navidrome/Subsonic Rating Sync App..."
 export PYTHONPATH="/app/"
 
 # Прокидываем опции из /data/options.json
-export NAVIDROME_URL="$(bashio::config 'navidrome_url')"
+export NAVIDROME_PROTOCOL="$(bashio::config 'navidrome_protocol')"
+export NAVIDROME_HOST="$(bashio::config 'navidrome_host')"
+export NAVIDROME_PORT="$(bashio::config 'navidrome_port')"
 export NAVIDROME_USER="$(bashio::config 'navidrome_user')"
 export NAVIDROME_PASS="$(bashio::config 'navidrome_password')"
 export MUSIC_FOLDER="$(bashio::config 'music_folder')"
