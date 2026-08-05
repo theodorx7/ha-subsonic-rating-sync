@@ -1,7 +1,7 @@
 FROM ghcr.io/home-assistant/base:latest
 
 # Python-зависимости (apk, т.к. base-образ — Alpine)
-RUN apk add --no-cache python3 py3-pip build-base  #нужен ли build-base и нужен ли  py3-pip именно для моего приложения и моих зависимостей для него???
+RUN apk add --no-cache python3 py3-pip
 
 WORKDIR /app
 
