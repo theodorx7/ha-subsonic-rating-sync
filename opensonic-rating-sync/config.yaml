@@ -21,7 +21,8 @@ options:
   server_port: 4533
   user: "fedor"
   password: ""
-  music_folder: "/media/MUSIC/test"
+  music_folder_id: "1"
+  music_folder: "/media/MUSIC"
   sync_interval_minutes: 60
   conflict_resolution: "server_wins"
   dry_run: true
@@ -33,6 +34,7 @@ schema:
   server_port: int
   user: str
   password: password
+  music_folder_id: str
   music_folder: str
   sync_interval_minutes: int
   conflict_resolution: match(^(server_wins|file_wins)$)
