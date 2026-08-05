@@ -8,14 +8,14 @@ logger = setup_logger()
 
 def main():
     config = {
-        'navidrome_protocol': os.environ.get('NAVIDROME_PROTOCOL', 'http'),
-        'navidrome_host': os.environ.get('NAVIDROME_HOST', 'localhost'),
-        'navidrome_port': int(os.environ.get('NAVIDROME_PORT') or 4533),
+        'server_protocol': os.environ.get('SERVER_PROTOCOL', 'http'),
+        'server_host': os.environ.get('SERVER_HOST', 'localhost'),
+        'server_port': int(os.environ.get('SERVER_PORT') or 4533),
         'navidrome_user': os.environ.get('NAVIDROME_USER'),
         'navidrome_password': os.environ.get('NAVIDROME_PASS'),
         'music_folder': os.environ.get('MUSIC_FOLDER', '/music'),
         'sync_interval_minutes': int(os.environ.get('SYNC_INTERVAL') or 60),
-        'conflict_resolution': os.environ.get('CONFLICT_RES', 'server_wins'),
+        'conflict_resolution': os.environ.get('CONFLICT_RES'),
         'dry_run': os.environ.get('DRY_RUN', 'false').lower() == 'true'
     }
     
