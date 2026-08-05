@@ -1,6 +1,7 @@
-
-#!/usr/bin/env bashio
+#!/usr/bin/with-contenv bashio
 set -e
+
+bashio::log.info "Starting Navidrome/Subsonic Rating Sync App..."
 
 # Чтение опций из HA
 NAVIDROME_URL=$(bashio::config 'navidrome_url')
@@ -13,5 +14,5 @@ DRY_RUN=$(bashio::config 'dry_run')
 
 export NAVIDROME_URL NAVIDROME_USER NAVIDROME_PASS MUSIC_FOLDER SYNC_INTERVAL CONFLICT_RES DRY_RUN
 
-echo "Starting Navidrome StarSync Add-on..."
-exec python -m src
+export PYTHONPATH="/app/"
+exec python3 -u -m opensonic-rating-sync
