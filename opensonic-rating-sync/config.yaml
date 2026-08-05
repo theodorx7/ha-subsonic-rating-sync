@@ -28,7 +28,7 @@ options:
   debug: false
 
 schema:
-  navidrome_protocol: list(http|https)
+  navidrome_protocol: list(https|http|ftp)
   navidrome_host: str
   navidrome_port: int
   navidrome_user: str
