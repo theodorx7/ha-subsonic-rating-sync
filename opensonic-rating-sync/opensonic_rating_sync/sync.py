@@ -28,8 +28,8 @@ class SyncAgent:
 
         self.conn = libopensonic.Connection(
             base_url=base_url,
-            username=config['server_user'],
-            password=config['server_password'],
+            username=config['user'],
+            password=config['password'],
             port=config['server_port'],
         )
         logger.info("Подключение к Navidrome установлено.")
