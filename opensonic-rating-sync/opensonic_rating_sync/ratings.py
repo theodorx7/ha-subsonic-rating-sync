@@ -1,195 +1,187 @@
-import os
-from .logger import setup_logger
-from .locker import get_file_lock
-from .database import get_track_state, upsert_track_state
-from . import ratings
-import libopensonic
+import logging
+from mutagen import File as MutagenFile
+from mutagen.aiff import AIFF
+from mutagen.id3 import ID3, POPM, TXXX
+from mutagen.mp3 import MP3
+from mutagen.mp4 import MP4
 
-logger = setup_logger()
+logger = logging.getLogger(__name__)
 
-class SyncAgent:
-    def __init__(self, config):
-        self.config = config
+# --- МАППИНГИ (Оригинальные из PlexMusicRatingsSync) ---
+_PRIMARY_MP3_RATING_MAP = {0: 0, 1: 13, 2: 1, 3: 54, 4: 64, 5: 118, 6: 128, 7: 186, 8: 196, 9: 242, 10: 255}
+_ALTERNATIVE_MP3_RATING_MAP = {0: 0, 2: 1, 4: 64, 6: 128, 8: 196, 10: 255}
+_PICARD_MP3_RATING_MAP = {0: 0, 2: 51, 4: 102, 6: 153, 8: 204, 10: 255}
+_KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email", "Plex"]
+_AIFF_FORMATS = {".aif": "AIFF", ".aiff": "AIFF"}
+_XIPH_FORMATS = {".flac": "FLAC", ".ogg": "OGG", ".opus": "OPUS"}
 
-        # Очистка хоста без регулярных выражений
-        host = config['server_host'].strip().lower()
-        
-        # Удаляем http:// или https:// если пользователь их ввел
-        if host.startswith('https://'):
-            host = host[8:]
-        elif host.startswith('http://'):
-            host = host[7:]
-        
-        # Отрезаем всё, что после слэша (пути), и всё, что после двоеточия (порт)
-        host = host.split('/')[0].split(':')[0]
+# --- РЕЙТИНГ (Шкала 1-10) ---
+def _popm_rating_to_internal(popm_rating, email=None):
+    if popm_rating == 0 or popm_rating is None: return None
+    if email in _KNOWN_PRIMARY_RATING_PLAYERS:
+        for internal_rating, popm_value in _PRIMARY_MP3_RATING_MAP.items():
+            if popm_rating == popm_value: return internal_rating
+    for map_to_try in [_ALTERNATIVE_MP3_RATING_MAP, _PICARD_MP3_RATING_MAP]:
+        for internal_rating, popm_value in map_to_try.items():
+            if popm_rating == popm_value: return internal_rating
+    return min(10, max(1, round((popm_rating / 255) * 9 + 1)))
 
-        # Склеиваем протокол из выпадающего списка и очищенный хост
-        base_url = f"{config['server_protocol']}://{host}"
+def _internal_rating_to_popm(internal_rating):
+    if internal_rating == 0 or internal_rating is None: return 0
+    return _PRIMARY_MP3_RATING_MAP.get(internal_rating, 0)
 
-        self.conn = libopensonic.Connection(
-            base_url=base_url,
-            username=config['server_user'],
-            password=config['server_password'],
-            port=config['server_port'],
-        )
-        logger.info("Подключение к Navidrome установлено.")
+def _get_rating_from_mp3(file_path):
+    try:
+        audio = MP3(file_path, ID3=ID3)
+        if audio.tags:
+            popm_frames = audio.tags.getall("POPM")
+            if popm_frames:
+                plex_popm = next((f for f in popm_frames if f.email == "Plex"), None)
+                if plex_popm: return _popm_rating_to_internal(plex_popm.rating, "Plex")
+                return _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
+    except Exception as e: logger.error(f"MP3 read rating err: {e}")
+    return None
 
-    def run_sync(self):
-        logger.info("Начало цикла синхронизации...")
-        server_songs = self._fetch_all_server_songs()
-        logger.info(f"Найдено треков на сервере: {len(server_songs)}")
-        
-        for song in server_songs:
-            try:
-                self._process_song(song)
-            except Exception as e:
-                logger.error(f"Ошибка при обработке трека {getattr(song, 'id', 'Unknown')}: {e}")
-
-        logger.info("Цикл синхронизации завершен.")
-
-    def _fetch_all_server_songs(self):
-        """Обход библиотеки Navidrome через OpenSubsonic API."""
-        songs = []
-        offset = 0
-        size = 500 # Пагинация
-        
-        while True:
-            try:
-                # get_album_list2 возвращает объект AlbumList2
-                res = self.conn.get_album_list2(ltype="alphabeticalByName", size=size, offset=offset)
-                if not res or not hasattr(res, 'album') or not res.album:
-                    break
-                
-                for album in res.album:
-                    # get_album возвращает AlbumWithSongsID3
-                    album_data = self.conn.get_album(album.id)
-                    if album_data and hasattr(album_data, 'song') and album_data.song:
-                        songs.extend(album_data.song)
-                
-                if len(res.album) < size:
-                    break
-                offset += size
-            except Exception as e:
-                logger.error(f"Ошибка при получении списка альбомов: {e}")
-                break
-                
-        return songs
-
-    def _process_song(self, song):
-        # 1. Текущие данные с сервера (0-5)
-        srv_starred = 1 if song.starred else 0
-        srv_rating = song.user_rating if song.user_rating else 0
-
-        # 2. Формируем путь
-        if not hasattr(song, 'path') or not song.path:
-            logger.warning(f"Трек {song.id} не имеет атрибута path. Пропуск.")
-            return
-
-        file_path = os.path.join(self.config['music_folder'], song.path)
-        if not os.path.exists(file_path):
-            logger.warning(f"Файл не найден на диске: {file_path}")
-            return
-
-        current_mtime = os.stat(file_path).st_mtime_ns
-        db_state = get_track_state(song.id)
-        
-        if not db_state:
-            db_state = {
-                'file_mtime_ns': 0, 'file_starred': None, 'file_rating': None,
-                'server_starred': None, 'server_rating': None
-            }
-
-        # 3. Читаем теги файла только если mtime изменилось
-        if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
-            f_starred = ratings.get_starred_from_file(file_path)
-            f_rating_internal = ratings.get_rating_from_file(file_path)
+def _set_rating_to_mp3(file_path, internal_rating):
+    try:
+        popm_rating = _internal_rating_to_popm(internal_rating)
+        audio = MP3(file_path, ID3=ID3)
+        if audio.tags is None: audio.tags = ID3()
+        popm_frames = audio.tags.getall("POPM")
+        plex_popm = next((f for f in popm_frames if f.email == "Plex"), None)
+        if plex_popm:
+            plex_popm.rating = popm_rating; plex_popm.count = 0
         else:
-            f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
-            f_rating_internal = db_state['file_rating']
+            audio.tags.add(POPM(email="Plex", rating=popm_rating, count=0))
+        audio.save()
+    except Exception as e: logger.error(f"MP3 write rating err: {e}")
 
-        # Конвертация шкалы файла (1-10) в шкалу сервера (0-5)
-        f_rating_os = 0
-        if f_rating_internal is not None and f_rating_internal > 0:
-            f_rating_os = round(f_rating_internal / 2)
+def _get_rating_from_xiph(file_path):
+    try:
+        audio = MutagenFile(file_path)
+        if audio:
+            rating_raw = audio.get("RATING")
+            if rating_raw:
+                xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+                if xiph_rating == 0: return None
+                return max(1, min(10, round(xiph_rating / 10))) # Конвертация 10-100 в 1-10
+    except Exception as e: logger.error(f"Xiph read rating err: {e}")
+    return None
 
-        # 4. МАТРИЦА РЕШЕНИЙ
-        t_star, w_file_star, w_srv_star = self._resolve_conflict(
-            srv_starred, f_starred, db_state['server_starred'], db_state['file_starred']
-        )
-        
-        # Для рейтинга передаем значения, нормализованные к 0
-        db_f_rating_os = round(db_state['file_rating'] / 2) if db_state['file_rating'] else 0
-        t_rate_os, w_file_rate, w_srv_rate = self._resolve_conflict(
-            srv_rating, f_rating_os, db_state['server_rating'], db_f_rating_os
-        )
+def _set_rating_to_xiph(file_path, internal_rating):
+    try:
+        audio = MutagenFile(file_path)
+        if audio:
+            xiph_rating = "0" if internal_rating is None or internal_rating == 0 else str(max(10, min(100, internal_rating * 10)))
+            audio["RATING"] = xiph_rating
+            audio.save()
+    except Exception as e: logger.error(f"Xiph write rating err: {e}")
 
-        write_file = w_file_star or w_file_rate
-        write_server = w_srv_star or w_srv_rate
+def _get_rating_from_m4a(file_path):
+    try:
+        audio = MP4(file_path)
+        rating_raw = audio.tags.get("rate") if audio.tags else None
+        if rating_raw:
+            m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+            if m4a_rating == 0: return None
+            return max(1, min(10, round(m4a_rating / 10)))
+    except Exception as e: logger.error(f"M4A read rating err: {e}")
+    return None
 
-        # 5. Применение изменений
-        if self.config.get('dry_run', False):
-            logger.info(f"[DRY-RUN] Трек {song.id}: Пишем файл={write_file}, Пишем сервер={write_server}")
-        else:
-            lock = get_file_lock(song.id)
-            try:
-                with lock:
-                    if write_file:
-                        # Конвертация шкалы сервера (0-5) в шкалу файла (1-10)
-                        t_rate_internal = t_rate_os * 2 if t_rate_os > 0 else 0
-                        ratings.set_starred_to_file(file_path, t_star)
-                        ratings.set_rating_to_file(file_path, t_rate_internal)
-                        current_mtime = os.stat(file_path).st_mtime_ns
-                    
-                    if write_server:
-                        if t_star == 1 and srv_starred == 0: 
-                            self.conn.star(id=song.id)
-                        elif t_star == 0 and srv_starred == 1: 
-                            self.conn.unstar(id=song.id)
-                        if t_rate_os != srv_rating: 
-                            self.conn.set_rating(song.id, t_rate_os)
-            except Exception as e:
-                logger.error(f"Ошибка блокировки/записи для {song.id}: {e}")
-                return
+def _set_rating_to_m4a(file_path, internal_rating):
+    try:
+        audio = MP4(file_path)
+        if audio.tags is None: audio.tags = MP4Tags()
+        m4a_rating = "0" if internal_rating is None or internal_rating == 0 else str(max(10, min(100, internal_rating * 10)))
+        audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
+        audio.save()
+    except Exception as e: logger.error(f"M4A write rating err: {e}")
 
-        # 6. Сохраняем финальное состояние в БД
-        final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
-        upsert_track_state(
-            song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-            f_starred=t_star, f_rating=final_f_rating,
-            s_starred=t_star, s_rating=t_rate_os
-        )
+# Универсальные функции рейтинга
+def get_rating_from_file(file_path):
+    if file_path.endswith(".mp3"): return _get_rating_from_mp3(file_path)
+    if file_path.endswith(".m4a"): return _get_rating_from_m4a(file_path)
+    for ext, _ in _AIFF_FORMATS.items():
+        if file_path.endswith(ext): return _get_rating_from_mp3(file_path) # AIFF uses ID3
+    for ext, _ in _XIPH_FORMATS.items():
+        if file_path.endswith(ext): return _get_rating_from_xiph(file_path)
+    return None
 
-    def _resolve_conflict(self, srv_val, f_val, db_srv_val, db_f_val):
-        """Универсальная матрица решений. Возвращает (target_value, write_file, write_server)"""
-        # Нормализация None
-        srv_val = 0 if srv_val is None else srv_val
-        f_val = 0 if f_val is None else f_val
-        db_srv_val = 0 if db_srv_val is None else db_srv_val
-        db_f_val = 0 if db_f_val is None else db_f_val
+def set_rating_to_file(file_path, internal_rating):
+    if file_path.endswith(".mp3"): _set_rating_to_mp3(file_path, internal_rating)
+    elif file_path.endswith(".m4a"): _set_rating_to_m4a(file_path, internal_rating)
+    else:
+        for ext, _ in _AIFF_FORMATS.items():
+            if file_path.endswith(ext): _set_rating_to_mp3(file_path, internal_rating)
+        for ext, _ in _XIPH_FORMATS.items():
+            if file_path.endswith(ext): _set_rating_to_xiph(file_path, internal_rating)
 
-        srv_changed = (srv_val != db_srv_val)
-        f_changed = (f_val != db_f_val)
 
-        # 1. Ничего не изменилось
-        if not srv_changed and not f_changed:
-            return srv_val, False, False
-        
-        # 2. Изменился только сервер
-        if srv_changed and not f_changed:
-            return srv_val, True, False
-        
-        # 3. Изменился только файл
-        if not srv_changed and f_changed:
-            return f_val, False, True
-        
-        # 4. Изменились обе стороны (Конфликт)
-        if srv_changed and f_changed:
-            if srv_val == f_val: 
-                return srv_val, False, False # Разрешено само собой
-            
-            if self.config['conflict_resolution'] == 'server_wins':
-                return srv_val, True, False
-            elif self.config['conflict_resolution'] == 'file_wins':
-                return f_val, False, True
-        
-        return srv_val, False, False
+# --- ИЗБРАННОЕ (Звезда / 0-1) ---
+_FAV_TAG_MP3 = "FAVORITE"
+_FAV_TAG_VORBIS = "FAVORITE"
+_FAV_TAG_M4A = "----:com.apple.iTunes:FAVORITE"
+
+def _get_starred_from_mp3(file_path):
+    try:
+        audio = MP3(file_path, ID3=ID3)
+        if audio.tags:
+            fav_frames = audio.tags.getall("TXXX:" + _FAV_TAG_MP3)
+            if fav_frames: return 1 if str(fav_frames[0].text[0]) == "1" else 0
+    except Exception: pass
+    return 0
+
+def _set_starred_to_mp3(file_path, starred):
+    try:
+        audio = MP3(file_path, ID3=ID3)
+        if audio.tags is None: audio.tags = ID3()
+        audio.tags.delall("TXXX:" + _FAV_TAG_MP3)
+        audio.tags.add(TXXX(encoding=3, desc=_FAV_TAG_MP3, text="1" if starred else "0"))
+        audio.save()
+    except Exception as e: logger.error(f"MP3 write star err: {e}")
+
+def _get_starred_from_xiph(file_path):
+    try:
+        audio = MutagenFile(file_path)
+        if audio and _FAV_TAG_VORBIS in audio: return 1 if str(audio[_FAV_TAG_VORBIS][0]) == "1" else 0
+    except Exception: pass
+    return 0
+
+def _set_starred_to_xiph(file_path, starred):
+    try:
+        audio = MutagenFile(file_path)
+        if audio:
+            audio[_FAV_TAG_VORBIS] = "1" if starred else "0"
+            audio.save()
+    except Exception as e: logger.error(f"Vorbis write star err: {e}")
+
+def _get_starred_from_m4a(file_path):
+    try:
+        audio = MP4(file_path)
+        if audio.tags and _FAV_TAG_M4A in audio.tags:
+            return 1 if audio.tags[_FAV_TAG_M4A][0].decode('utf-8') == "1" else 0
+    except Exception: pass
+    return 0
+
+def _set_starred_to_m4a(file_path, starred):
+    try:
+        audio = MP4(file_path)
+        if audio.tags is None: audio.tags = MP4Tags()
+        audio.tags[_FAV_TAG_M4A] = [bytes("1" if starred else "0", 'utf-8')]
+        audio.save()
+    except Exception as e: logger.error(f"M4A write star err: {e}")
+
+# Универсальные функции звезды
+def get_starred_from_file(file_path):
+    if file_path.endswith(".mp3") or file_path.endswith(".aif") or file_path.endswith(".aiff"): return _get_starred_from_mp3(file_path)
+    for ext, _ in _XIPH_FORMATS.items():
+        if file_path.endswith(ext): return _get_starred_from_xiph(file_path)
+    if file_path.endswith(".m4a"): return _get_starred_from_m4a(file_path)
+    return 0
+
+def set_starred_to_file(file_path, starred):
+    if file_path.endswith(".mp3") or file_path.endswith(".aif") or file_path.endswith(".aiff"): _set_starred_to_mp3(file_path, starred)
+    else:
+        for ext, _ in _XIPH_FORMATS.items():
+            if file_path.endswith(ext): _set_starred_to_xiph(file_path, starred)
+        if file_path.endswith(".m4a"): _set_starred_to_m4a(file_path, starred)
