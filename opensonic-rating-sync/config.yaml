@@ -1,17 +1,39 @@
-# https://developers.home-assistant.io/docs/apps/configuration#app-configuration
-name: Example app
-version: "1.3.1"
-slug: example
-description: Example app
-url: "https://github.com/home-assistant/apps-example/tree/main/example"
+name: "Home Assistant App: Syncing rating/favorite/like tags between audio files and Navidrome — Subsonic/Opensonic API"
+version: "1.0.0"
+slug: "subsonic-rating-sync"
+description: "Syncing rating/favorite/like tags between audio files and Navidrome (Subsonic/Opensonic API). Supported sync modes: two-way, one-way (Files → Navidrome), or (Navidrome → Files)."
+url: "https://github.com/theodorx7/ha-subsonic-rating-sync"
 arch:
   - aarch64
   - amd64
 init: false
+startup: application # или нужно задать значение services ?
+boot: auto
 map:
   - share:rw
 options:
-  message: "Hello world..."
+  navidrome_url: "https://musicfx.duckdns.org:4533/"
+  navidrome_user: "fedor"
+  navidrome_password: ""
+  music_folder: "/media/MUSIC"
+  sync_interval_minutes: 60
+  conflict_resolution: "server_wins"
+  dry_run: false
+
+  debug: false
+
 schema:
-  message: "str?"
-image: "ghcr.io/home-assistant/app-example"
+  navidrome_url: str
+  navidrome_user: str
+  navidrome_password: password
+  music_folder: str
+  sync_interval_minutes: int
+  conflict_resolution: list(server_wins|file_wins)
+  dry_run: bool
+
+  debug: bool
+  
+
+
+
+
