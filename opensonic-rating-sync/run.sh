@@ -1,4 +1,4 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bashio
 set -e
 
 bashio::log.info "Starting Navidrome/Subsonic Rating Sync App..."
