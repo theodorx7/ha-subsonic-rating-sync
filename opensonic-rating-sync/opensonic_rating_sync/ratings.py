@@ -3,7 +3,7 @@ from mutagen import File as MutagenFile
 from mutagen.aiff import AIFF
 from mutagen.id3 import ID3, POPM, TXXX
 from mutagen.mp3 import MP3
-from mutagen.mp4 import MP4
+from mutagen.mp4 import MP4, MP4Tags  # ИСПРАВЛЕНО: добавлен импорт MP4Tags
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def _get_rating_from_m4a(file_path):
 def _set_rating_to_m4a(file_path, internal_rating):
     try:
         audio = MP4(file_path)
-        if audio.tags is None: audio.tags = MP4Tags()
+        if audio.tags is None: audio.add_tags()
         m4a_rating = "0" if internal_rating is None or internal_rating == 0 else str(max(10, min(100, internal_rating * 10)))
         audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
         audio.save()
@@ -166,7 +166,7 @@ def _get_starred_from_m4a(file_path):
 def _set_starred_to_m4a(file_path, starred):
     try:
         audio = MP4(file_path)
-        if audio.tags is None: audio.tags = MP4Tags()
+        if audio.tags is None: audio.add_tags()
         audio.tags[_FAV_TAG_M4A] = [bytes("1" if starred else "0", 'utf-8')]
         audio.save()
     except Exception as e: logger.error(f"M4A write star err: {e}")
