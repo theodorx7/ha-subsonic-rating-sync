@@ -16,7 +16,9 @@ map:
   - share:rw
 
 options:
-  navidrome_url: "http://localhost:4533"
+  navidrome_protocol: "https"
+  navidrome_host: "localhost"
+  navidrome_port: 4533
   navidrome_user: "fedor"
   navidrome_password: ""
   music_folder: "/media/MUSIC/test"
@@ -26,7 +28,9 @@ options:
   debug: false
 
 schema:
-  navidrome_url: str
+  navidrome_protocol: list(http|https)
+  navidrome_host: str
+  navidrome_port: int
   navidrome_user: str
   navidrome_password: password
   music_folder: str
