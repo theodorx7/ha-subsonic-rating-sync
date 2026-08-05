@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bashio
+
+bashio::log.info "Starting Navidrome/Subsonic Rating Sync App..."
+
+export PYTHONPATH="/app/"
+exec python3 -u -m opensonic-rating-sync
