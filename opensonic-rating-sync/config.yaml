@@ -24,11 +24,11 @@ options:
   music_folder: "/media/MUSIC/test"
   sync_interval_minutes: 60
   conflict_resolution: "server_wins"
-  dry_run: false
-  debug: false
+  dry_run: true
+  debug: true
 
 schema:
-  navidrome_protocol: list(https|http|ftp)
+  navidrome_protocol: list(https|http)
   navidrome_host: str
   navidrome_port: int
   navidrome_user: str
