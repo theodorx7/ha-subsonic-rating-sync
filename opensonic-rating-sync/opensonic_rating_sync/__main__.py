@@ -8,7 +8,9 @@ logger = setup_logger()
 
 def main():
     config = {
-        'navidrome_url': os.environ.get('NAVIDROME_URL'),
+        'navidrome_protocol': os.environ.get('NAVIDROME_PROTOCOL', 'http'),
+        'navidrome_host': os.environ.get('NAVIDROME_HOST', 'localhost'),
+        'navidrome_port': int(os.environ.get('NAVIDROME_PORT') or 4533),
         'navidrome_user': os.environ.get('NAVIDROME_USER'),
         'navidrome_password': os.environ.get('NAVIDROME_PASS'),
         'music_folder': os.environ.get('MUSIC_FOLDER', '/music'),
