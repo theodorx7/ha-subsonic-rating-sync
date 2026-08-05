@@ -7,11 +7,13 @@ from .database import init_db
 logger = setup_logger()
 
 def main():
-    # Унифицированы имена переменных окружения, которые экспортирует run.sh
     config = {
-        'navidrome_url': os.environ.get('NAVIDROME_URL', 'http://localhost:4533'),
-        'username': os.environ.get('NAVIDROME_USER', ''),
-        'password': os.environ.get('NAVIDROME_PASS', ''),
+        'server_protocol': os.environ.get('SERVER_PROTOCOL', 'http'),
+        'server_host': os.environ.get('SERVER_HOST', 'localhost'),
+        'server_port': int(os.environ.get('SERVER_PORT') or 4533),
+        'user': os.environ.get('SERVER_USER', ''),
+        'password': os.environ.get('SERVER_PASSWORD', ''),
+        'api_key': os.environ.get('API_KEY', ''),
         'music_folder': os.environ.get('MUSIC_FOLDER', '/music'),
         'music_folder_id': os.environ.get('MUSIC_FOLDER_ID', ''),
         'sync_interval_minutes': int(os.environ.get('SYNC_INTERVAL') or 60),
