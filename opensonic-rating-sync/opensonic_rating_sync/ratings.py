@@ -24,13 +24,13 @@ class SyncAgent:
         host = host.split('/')[0].split(':')[0]
 
         # Склеиваем протокол из выпадающего списка и очищенный хост
-        base_url = f"{config['navidrome_protocol']}://{host}"
+        base_url = f"{config['server_protocol']}://{host}"
 
         self.conn = libopensonic.Connection(
             base_url=base_url,
-            username=config['navidrome_user'],
-            password=config['navidrome_password'],
-            port=config['navidrome_port'],
+            username=config['server_user'],
+            password=config['server_password'],
+            port=config['server_port'],
         )
         logger.info("Подключение к Navidrome установлено.")
 
