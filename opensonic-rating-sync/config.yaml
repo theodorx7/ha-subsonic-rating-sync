@@ -1,4 +1,4 @@
-name: "Navidrome/Subsonic Rating Sync"
+name: "Navidrome / Subsonic Rating Sync"
 version: "1.0.0"
 slug: "subsonic-rating-sync"
 description: "Syncing rating/favorite/like tags between audio files and Navidrome (Subsonic/Opensonic API). Supported sync modes: two-way, one-way (Files → Navidrome), or (Navidrome → Files)."
