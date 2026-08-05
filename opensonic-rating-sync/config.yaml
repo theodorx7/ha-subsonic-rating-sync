@@ -9,8 +9,12 @@ arch:
 init: false
 startup: application # или нужно задать значение services ?
 boot: auto
-map:
+
+map:    # зачем нужен этот параметр?
   - share:rw
+
+usb: true
+
 options:
   navidrome_url: ""
   navidrome_user: "fedor"
@@ -30,7 +34,7 @@ schema:
   sync_interval_minutes: int
   conflict_resolution: list(server_wins|file_wins)
   dry_run: bool
-
+ 
   debug: bool
   
 
