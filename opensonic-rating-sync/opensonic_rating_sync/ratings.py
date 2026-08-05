@@ -12,7 +12,7 @@ class SyncAgent:
         self.config = config
 
         # Очистка хоста без регулярных выражений
-        host = config['navidrome_host'].strip().lower()
+        host = config['server_host'].strip().lower()
         
         # Удаляем http:// или https:// если пользователь их ввел
         if host.startswith('https://'):
