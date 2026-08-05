@@ -12,7 +12,7 @@ class SyncAgent:
         self.config = config
 
         # Надежная очистка хоста: берем только доменное имя, отбрасываем протокол, порт и слэши
-        host_raw = config['navidrome_host'].strip()
+        host_raw = config['server_host'].strip()
         # Удаляем http:// или https:// если пользователь их ввел
         host = re.sub(r'^https?://', '', host_raw, flags=re.IGNORECASE)
         # Удаляем всё после слэша (пути), если они есть
