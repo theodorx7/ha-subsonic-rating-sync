@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 from .logger import setup_logger
 from .locker import get_file_lock
 from .database import get_track_state, upsert_track_state
@@ -11,28 +12,36 @@ class SyncAgent:
     def __init__(self, config):
         self.config = config
 
-        # Очистка хоста без регулярных выражений
-        host = config['server_host'].strip().lower()
-        
-        # Удаляем http:// или https:// если пользователь их ввел
-        if host.startswith('https://'):
-            host = host[8:]
-        elif host.startswith('http://'):
-            host = host[7:]
-        
-        # Отрезаем всё, что после слэша (пути), и всё, что после двоеточия (порт)
-        host = host.split('/')[0].split(':')[0]
+        # Безопасный парсинг URL с помощью urllib
+        raw_url = config['navidrome_url']
+        if '://' not in raw_url:
+            raw_url = f"http://{raw_url}"
+            
+        parsed = urlparse(raw_url)
+        scheme = parsed.scheme or 'http'
+        host = parsed.hostname or raw_url.split('://')[-1].split(':')[0]
+        port = parsed.port or 4533  # По умолчанию берем 4533 для Navidrome
 
-        # Склеиваем протокол из выпадающего списка и очищенный хост
-        base_url = f"{config['server_protocol']}://{host}"
+        # py-opensonic собирает URL как f"{base_url}:{port}/...", поэтому base_url НЕ должен содержать порт
+        base_url = f"{scheme}://{host}"
 
         self.conn = libopensonic.Connection(
             base_url=base_url,
-            username=config['user'],
-            password=config['password'],
-            port=config['server_port'],
+            username=config.get('username', ''),
+            password=config.get('password', ''),
+            port=port,
+            app_name="ha-subsonic-rating-sync"
         )
-        logger.info("Подключение к Navidrome установлено.")
+        
+        # Реальная проверка подключения
+        try:
+            ok = self.conn.ping()
+            if not ok:
+                raise ConnectionError("ping() вернул False")
+            logger.info(f"Подключение к Navidrome установлено: {base_url}:{port} (ping OK)")
+        except Exception as e:
+            logger.error(f"Ошибка подключения к Navidrome ({base_url}:{port}): {e}")
+            raise
 
     def run_sync(self):
         logger.info("Начало цикла синхронизации...")
@@ -43,7 +52,7 @@ class SyncAgent:
             try:
                 self._process_song(song)
             except Exception as e:
-                logger.error(f"Ошибка при обработке трека {getattr(song, 'id', 'Unknown')}: {e}")
+                logger.error(f"Ошибка при обработке трека {getattr(song, 'id', 'Unknown')}: {e}", exc_info=True)
 
         logger.info("Цикл синхронизации завершен.")
 
@@ -55,30 +64,32 @@ class SyncAgent:
         
         while True:
             try:
-                # get_album_list2 возвращает объект AlbumList2
-                res = self.conn.get_album_list2(ltype="alphabeticalByName", size=size, offset=offset)
-                if not res or not hasattr(res, 'album') or not res.album:
+                # ИСПРАВЛЕНО: get_album_list2 возвращает плоский список list[AlbumID3], а не объект
+                albums = self.conn.get_album_list2(ltype="alphabeticalByName", size=size, offset=offset)
+                
+                if not albums:  # Просто проверяем пустоту списка
                     break
                 
-                for album in res.album:
-                    # get_album возвращает AlbumWithSongsID3
+                for album in albums:
+                    # get_album возвращает AlbumID3WithSongs
                     album_data = self.conn.get_album(album.id)
                     if album_data and hasattr(album_data, 'song') and album_data.song:
                         songs.extend(album_data.song)
                 
-                if len(res.album) < size:
+                if len(albums) < size:
                     break
                 offset += size
             except Exception as e:
-                logger.error(f"Ошибка при получении списка альбомов: {e}")
+                logger.error(f"Ошибка при получении списка альбомов: {e}", exc_info=True)
                 break
                 
         return songs
 
     def _process_song(self, song):
         # 1. Текущие данные с сервера (0-5)
-        srv_starred = 1 if song.starred else 0
-        srv_rating = song.user_rating if song.user_rating else 0
+        # song.starred содержит строку (timestamp), если отмечено, иначе None
+        srv_starred = 1 if getattr(song, 'starred', None) else 0
+        srv_rating = getattr(song, 'user_rating', 0) or 0
 
         # 2. Формируем путь
         if not hasattr(song, 'path') or not song.path:
@@ -141,14 +152,15 @@ class SyncAgent:
                         current_mtime = os.stat(file_path).st_mtime_ns
                     
                     if write_server:
+                        # ИСПРАВЛЕНО: правильные сигнатуры методов star/unstar (sids вместо id)
                         if t_star == 1 and srv_starred == 0: 
-                            self.conn.star(id=song.id)
+                            self.conn.star(sids=[song.id])
                         elif t_star == 0 and srv_starred == 1: 
-                            self.conn.unstar(id=song.id)
+                            self.conn.unstar(sids=[song.id])
                         if t_rate_os != srv_rating: 
                             self.conn.set_rating(song.id, t_rate_os)
             except Exception as e:
-                logger.error(f"Ошибка блокировки/записи для {song.id}: {e}")
+                logger.error(f"Ошибка блокировки/записи для {song.id}: {e}", exc_info=True)
                 return
 
         # 6. Сохраняем финальное состояние в БД
@@ -187,9 +199,10 @@ class SyncAgent:
             if srv_val == f_val: 
                 return srv_val, False, False # Разрешено само собой
             
-            if self.config['conflict_resolution'] == 'server_wins':
+            conflict_res = self.config.get('conflict_resolution', 'server_wins')
+            if conflict_res == 'server_wins':
                 return srv_val, True, False
-            elif self.config['conflict_resolution'] == 'file_wins':
+            elif conflict_res == 'file_wins':
                 return f_val, False, True
         
         return srv_val, False, False
