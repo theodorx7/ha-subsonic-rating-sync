@@ -1,6 +1,6 @@
 name: "Navidrome/Subsonic Rating Sync"
 version: "1.0.0"
-slug: "subsonic_rating_sync"
+slug: "subsonic-rating-sync"
 description: "Syncing rating/favorite/like tags between audio files and Navidrome (Subsonic/Opensonic API). Supported sync modes: two-way, one-way (Files → Navidrome), or (Navidrome → Files)."
 url: "https://github.com/theodorx7/ha-subsonic-rating-sync"
 arch:
