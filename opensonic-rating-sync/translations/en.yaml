@@ -1,12 +1,18 @@
 configuration:
-  navidrome_url:
-    name: Navidrome URL
+  server_protocol:
+    name: Server protocol
     description: Базовый URL вашего Navidrome/Subsonic сервера.
-  navidrome_user:
-    name: Navidrome user
+  server_port:
+    name: Server port
+    description: Базовый URL вашего Navidrome/Subsonic сервера.
+  server_url:
+    name: Server URL
+    description: Базовый URL вашего Navidrome/Subsonic сервера.
+  user:
+    name: User
     description: Имя пользователя для API-доступа.
-  navidrome_password:
-    name: Navidrome password
+  password:
+    name: Password
     description: Пароль пользователя.
   music_folder:
     name: Music folder
