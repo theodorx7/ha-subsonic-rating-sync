@@ -9,6 +9,7 @@ arch:
 
 startup: application # или нужно задать значение services ?
 boot: auto
+init: false
 
 map:
   - media:rw
