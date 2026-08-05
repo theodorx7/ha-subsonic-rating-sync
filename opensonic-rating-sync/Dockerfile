@@ -1,20 +1,20 @@
-FROM ghcr.io/home-assistant/base:latest AS builder
-RUN apk add --no-cache python3 py3-pip build-base python3-dev
-WORKDIR /app
-RUN pip install --no-cache-dir --user \
-    py-opensonic==10.2.1 \
-    mutagen==1.48.1 \
-    filelock==3.32.2
-
 FROM ghcr.io/home-assistant/base:latest
-RUN apk add --no-cache python3
+
+# Устанавливаем Python, временно ставим pip, ставим пакеты, удаляем pip
+RUN apk add --no-cache python3 \
+    && apk add --no-cache --virtual .build-deps py3-pip \
+    && pip install --no-cache-dir \
+        py-opensonic==10.2.1 \
+        mutagen==1.48.1 \
+        filelock==3.32.2 \
+    && apk del .build-deps
+
 WORKDIR /app
-COPY --from=builder /root/.local /root/.local
+
+# Копируем пакет Python и run-скрипт
 COPY opensonic_rating_sync/ ./opensonic_rating_sync/
 COPY run.sh /
 RUN chmod a+x /run.sh
-ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONPATH=/app/
 
 LABEL \
     io.hass.type="app" \
