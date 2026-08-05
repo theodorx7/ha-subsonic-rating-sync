@@ -3,7 +3,7 @@ FROM ghcr.io/home-assistant/base:latest
 # Устанавливаем Python, временно ставим pip, ставим пакеты, удаляем pip
 RUN apk add --no-cache python3 \
     && apk add --no-cache --virtual .build-deps py3-pip \
-    && pip install --no-cache-dir \
+    && pip install --no-cache-dir --break-system-packages \
         py-opensonic==10.2.1 \
         mutagen==1.48.1 \
         filelock==3.32.2 \
