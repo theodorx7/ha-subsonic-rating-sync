@@ -1,13 +1,13 @@
 import logging
+from urllib.parse import unquote
 from mutagen import File as MutagenFile
 from mutagen.aiff import AIFF
 from mutagen.id3 import ID3, POPM, TXXX
 from mutagen.mp3 import MP3
-from mutagen.mp4 import MP4, MP4Tags  # ИСПРАВЛЕНО: добавлен импорт MP4Tags
+from mutagen.mp4 import MP4, MP4Tags
 
 logger = logging.getLogger(__name__)
 
-# --- МАППИНГИ (Оригинальные из PlexMusicRatingsSync) ---
 _PRIMARY_MP3_RATING_MAP = {0: 0, 1: 13, 2: 1, 3: 54, 4: 64, 5: 118, 6: 128, 7: 186, 8: 196, 9: 242, 10: 255}
 _ALTERNATIVE_MP3_RATING_MAP = {0: 0, 2: 1, 4: 64, 6: 128, 8: 196, 10: 255}
 _PICARD_MP3_RATING_MAP = {0: 0, 2: 51, 4: 102, 6: 153, 8: 204, 10: 255}
@@ -56,6 +56,33 @@ def _set_rating_to_mp3(file_path, internal_rating):
         audio.save()
     except Exception as e: logger.error(f"MP3 write rating err: {e}")
 
+# --- НОВЫЕ ФУНКЦИИ ДЛЯ AIFF (Исправляют ошибку can't sync to MPEG frame) ---
+def _get_rating_from_aiff(file_path):
+    try:
+        audio = AIFF(file_path)
+        if audio.tags:
+            popm_frames = audio.tags.getall("POPM")
+            if popm_frames:
+                plex_popm = next((f for f in popm_frames if f.email == "Plex"), None)
+                if plex_popm: return _popm_rating_to_internal(plex_popm.rating, "Plex")
+                return _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
+    except Exception as e: logger.error(f"AIFF read rating err: {e}")
+    return None
+
+def _set_rating_to_aiff(file_path, internal_rating):
+    try:
+        popm_rating = _internal_rating_to_popm(internal_rating)
+        audio = AIFF(file_path)
+        if audio.tags is None: audio.tags = ID3()
+        popm_frames = audio.tags.getall("POPM")
+        plex_popm = next((f for f in popm_frames if f.email == "Plex"), None)
+        if plex_popm:
+            plex_popm.rating = popm_rating; plex_popm.count = 0
+        else:
+            audio.tags.add(POPM(email="Plex", rating=popm_rating, count=0))
+        audio.save()
+    except Exception as e: logger.error(f"AIFF write rating err: {e}")
+
 def _get_rating_from_xiph(file_path):
     try:
         audio = MutagenFile(file_path)
@@ -64,7 +91,7 @@ def _get_rating_from_xiph(file_path):
             if rating_raw:
                 xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
                 if xiph_rating == 0: return None
-                return max(1, min(10, round(xiph_rating / 10))) # Конвертация 10-100 в 1-10
+                return max(1, min(10, round(xiph_rating / 10)))
     except Exception as e: logger.error(f"Xiph read rating err: {e}")
     return None
 
@@ -97,12 +124,10 @@ def _set_rating_to_m4a(file_path, internal_rating):
         audio.save()
     except Exception as e: logger.error(f"M4A write rating err: {e}")
 
-# Универсальные функции рейтинга
 def get_rating_from_file(file_path):
     if file_path.endswith(".mp3"): return _get_rating_from_mp3(file_path)
     if file_path.endswith(".m4a"): return _get_rating_from_m4a(file_path)
-    for ext, _ in _AIFF_FORMATS.items():
-        if file_path.endswith(ext): return _get_rating_from_mp3(file_path) # AIFF uses ID3
+    if file_path.endswith(".aif") or file_path.endswith(".aiff"): return _get_rating_from_aiff(file_path)
     for ext, _ in _XIPH_FORMATS.items():
         if file_path.endswith(ext): return _get_rating_from_xiph(file_path)
     return None
@@ -110,9 +135,8 @@ def get_rating_from_file(file_path):
 def set_rating_to_file(file_path, internal_rating):
     if file_path.endswith(".mp3"): _set_rating_to_mp3(file_path, internal_rating)
     elif file_path.endswith(".m4a"): _set_rating_to_m4a(file_path, internal_rating)
+    elif file_path.endswith(".aif") or file_path.endswith(".aiff"): _set_rating_to_aiff(file_path, internal_rating)
     else:
-        for ext, _ in _AIFF_FORMATS.items():
-            if file_path.endswith(ext): _set_rating_to_mp3(file_path, internal_rating)
         for ext, _ in _XIPH_FORMATS.items():
             if file_path.endswith(ext): _set_rating_to_xiph(file_path, internal_rating)
 
@@ -139,6 +163,24 @@ def _set_starred_to_mp3(file_path, starred):
         audio.tags.add(TXXX(encoding=3, desc=_FAV_TAG_MP3, text="1" if starred else "0"))
         audio.save()
     except Exception as e: logger.error(f"MP3 write star err: {e}")
+
+def _get_starred_from_aiff(file_path):
+    try:
+        audio = AIFF(file_path)
+        if audio.tags:
+            fav_frames = audio.tags.getall("TXXX:" + _FAV_TAG_MP3)
+            if fav_frames: return 1 if str(fav_frames[0].text[0]) == "1" else 0
+    except Exception: pass
+    return 0
+
+def _set_starred_to_aiff(file_path, starred):
+    try:
+        audio = AIFF(file_path)
+        if audio.tags is None: audio.tags = ID3()
+        audio.tags.delall("TXXX:" + _FAV_TAG_MP3)
+        audio.tags.add(TXXX(encoding=3, desc=_FAV_TAG_MP3, text="1" if starred else "0"))
+        audio.save()
+    except Exception as e: logger.error(f"AIFF write star err: {e}")
 
 def _get_starred_from_xiph(file_path):
     try:
@@ -171,16 +213,17 @@ def _set_starred_to_m4a(file_path, starred):
         audio.save()
     except Exception as e: logger.error(f"M4A write star err: {e}")
 
-# Универсальные функции звезды
 def get_starred_from_file(file_path):
-    if file_path.endswith(".mp3") or file_path.endswith(".aif") or file_path.endswith(".aiff"): return _get_starred_from_mp3(file_path)
+    if file_path.endswith(".mp3"): return _get_starred_from_mp3(file_path)
+    if file_path.endswith(".aif") or file_path.endswith(".aiff"): return _get_starred_from_aiff(file_path)
     for ext, _ in _XIPH_FORMATS.items():
         if file_path.endswith(ext): return _get_starred_from_xiph(file_path)
     if file_path.endswith(".m4a"): return _get_starred_from_m4a(file_path)
     return 0
 
 def set_starred_to_file(file_path, starred):
-    if file_path.endswith(".mp3") or file_path.endswith(".aif") or file_path.endswith(".aiff"): _set_starred_to_mp3(file_path, starred)
+    if file_path.endswith(".mp3"): _set_starred_to_mp3(file_path, starred)
+    elif file_path.endswith(".aif") or file_path.endswith(".aiff"): _set_starred_to_aiff(file_path, starred)
     else:
         for ext, _ in _XIPH_FORMATS.items():
             if file_path.endswith(ext): _set_starred_to_xiph(file_path, starred)
