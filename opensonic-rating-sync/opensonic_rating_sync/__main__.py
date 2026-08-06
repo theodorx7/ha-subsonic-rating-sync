@@ -8,7 +8,7 @@ logger = setup_logger()
 
 def main():
     config = {
-        'server_protocol': os.environ.get('SERVER_PROTOCOL', '').strip(),
+        'server_protocol': os.environ.get('SERVER_PROTOCOL', ''),
         'server_host': os.environ.get('SERVER_HOST', '').strip(),
         'server_port': int(os.environ.get('SERVER_PORT') or 443),
         'user': os.environ.get('SERVER_USER', ''),
@@ -20,6 +20,12 @@ def main():
         'conflict_resolution': os.environ.get('CONFLICT_RES', ''),
         'dry_run': os.environ.get('DRY_RUN', 'false').lower() == 'true'
     }
+
+    # Проверка обязательного поля server_host
+    if not config['server_host']:
+        error_msg = "Поле "Адрес сервера" обязательно для заполнения, перейдите в настройки оддона и заполните обязательные поля!"
+        logger.error(error_msg)
+        sys.exit(1) # Завершаем работу аддона с кодом ошибки
     
     logger.info("Инициализация БД...")
     init_db()
