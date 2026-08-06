@@ -124,20 +124,22 @@ class SyncAgent:
     def _process_song(self, song):
         srv_starred = 1 if getattr(song, 'starred', None) else 0
         srv_rating = getattr(song, 'user_rating', 0) or 0
-
-        if not hasattr(song, 'path') or not song.path:
+    
+        if not getattr(song, 'path', None):
             logger.warning(f"Трек {song.id} не имеет атрибута path. Пропуск.")
             return
-        # 1. Декодируем URL (если Navidrome передал %20 и т.д.) и убираем начальный слеш
-        relative_path = unquote(song.path).lstrip('/')
-        
-        # 2. Склеиваем базовую папку и относительный путь, нормализуем слеши
-        base_folder = self.config['music_folder'].rstrip('/')
-        file_path = os.path.normpath(os.path.join(base_folder, relative_path))
-        
-        # 3. КРИТИЧЕСКАЯ ПРОВЕРКА существования файла
+    
+        # Navidrome с "Report Full Path" отдаёт АБСОЛЮТНЫЙ путь.
+        # Без этой опции (или для Airsonic) — относительный вида Artist/Album/Track.
+        raw_path = unquote(song.path)
+        if os.path.isabs(raw_path):
+            file_path = os.path.normpath(raw_path)
+        else:
+            base_folder = self.config['music_folder'].rstrip('/')
+            file_path = os.path.normpath(os.path.join(base_folder, raw_path.lstrip('/')))
+    
         if not os.path.exists(file_path):
-            logger.warning(f"Файл не найден на диске: {file_path}")
+            logger.warning(f"Файл не найден на диске: {file_path} (path из API: {song.path})")
             return
 
         current_mtime = os.stat(file_path).st_mtime_ns
