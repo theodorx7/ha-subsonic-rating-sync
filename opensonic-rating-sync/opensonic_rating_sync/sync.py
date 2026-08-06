@@ -65,9 +65,9 @@ class SyncAgent:
 
     def _fetch_all_server_songs(self):
         """
-        Получаем треки через физическую файловую структуру.
-        Шаг 1: Запрашиваем индексы (папки) для указанной библиотеки (music_folder_id).
-        Шаг 2: Рекурсивно обходим найденные папки через getMusicDirectory.
+        Получаем треки строго через физическую файловую структуру.
+        Согласно документации OpenSubsonic, getIndexes с параметром musicFolderId
+        возвращает физические директории внутри указанной библиотеки.
         """
         songs = []
         mf_id = self.config.get('music_folder_id') or None
@@ -77,20 +77,21 @@ class SyncAgent:
             return songs
             
         try:
-            logger.info(f"Запрос индексов для библиотеки ID={mf_id}...")
+            logger.info(f"Запрос физических индексов (getIndexes) для библиотеки ID={mf_id}...")
             
-            # Используем get_indexes вместо get_music_folders, чтобы обойти баг парсера
+            # Передаем ID вашей библиотеки напрямую в getIndexes
             indexes = self.conn.get_indexes(music_folder_id=mf_id)
             
             if not indexes or not hasattr(indexes, 'index') or not indexes.index:
-                logger.warning("Сервер не вернул индексов (папок) для указанной библиотеки.")
+                logger.warning("Сервер не вернул физических папок для указанной библиотеки.")
                 return songs
                 
             # Проходимся по всем буквам/группам индекса
             for idx in indexes.index:
                 if hasattr(idx, 'artist') and idx.artist:
                     for artist_folder in idx.artist:
-                        # Запускаем рекурсивный обход для каждой найденной корневой папки
+                        # artist_folder.id здесь — это реальный ID папки на диске
+                        # Запускаем рекурсивный обход
                         self._scan_directory(artist_folder.id, songs)
                         
         except Exception as e:
@@ -99,18 +100,22 @@ class SyncAgent:
         return songs
 
     def _scan_directory(self, dir_id, songs_list):
-        """Рекурсивный обход папок через Subsonic API (getMusicDirectory)."""
+        """
+        Рекурсивный обход папок через getMusicDirectory.
+        Возвращает реальные пути к файлам на диске.
+        """
         try:
             dir_data = self.conn.get_music_directory(dir_id)
             if not dir_data or not hasattr(dir_data, 'child') or not dir_data.child:
                 return
                 
             for child in dir_data.child:
-                # isDir или is_dir в зависимости от версии API/библиотеки
+                # Проверяем, является ли объект папкой
                 is_dir = getattr(child, 'is_dir', False) or getattr(child, 'isDir', False)
                 if is_dir:
                     self._scan_directory(child.id, songs_list)
                 else:
+                    # Для файлов атрибут path будет содержать физический путь
                     songs_list.append(child)
                     
         except Exception as e:
