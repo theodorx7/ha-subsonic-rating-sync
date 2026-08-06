@@ -1,4 +1,5 @@
 import os
+from urllib.parse import unquote
 from .logger import setup_logger
 from .locker import get_file_lock
 from .database import get_track_state, upsert_track_state
@@ -11,7 +12,6 @@ class SyncAgent:
     def __init__(self, config):
         self.config = config
 
-        # Очистка хоста
         host = config['server_host'].strip().lower()
         if host.startswith('https://'):
             host = host[8:]
@@ -21,8 +21,6 @@ class SyncAgent:
 
         base_url = f"{config['server_protocol']}://{host}"
 
-        # Логика авторизации: используем API Key, если он указан, иначе логин/пароль.
-        # Пустые строки преобразуем в None, чтобы py-opensonic не падал.
         api_key = config.get('api_key') or None
         username = config.get('user') or None
         password = config.get('password') or None
@@ -43,7 +41,6 @@ class SyncAgent:
 
         self.conn = libopensonic.Connection(**conn_kwargs)
         
-        # Проверка подключения
         try:
             ok = self.conn.ping()
             if not ok:
@@ -67,32 +64,27 @@ class SyncAgent:
         logger.info("Цикл синхронизации завершен.")
 
     def _fetch_all_server_songs(self):
-        """Обход библиотеки Navidrome через OpenSubsonic API."""
         songs = []
         offset = 0
-        size = 500 # Пагинация
+        size = 500
         mf_id = self.config.get('music_folder_id') or None
         
         while True:
             try:
-                # ИСПОЛЬЗУЕМ get_album_list, т.к. он поддерживает фильтрацию по music_folder_id
                 albums = self.conn.get_album_list(
                     ltype="alphabeticalByName", 
                     size=size, 
                     offset=offset,
                     music_folder_id=mf_id
                 )
-                
-                if not albums:
-                    break
+                if not albums: break
                 
                 for album in albums:
                     album_data = self.conn.get_album(album.id)
                     if album_data and hasattr(album_data, 'song') and album_data.song:
                         songs.extend(album_data.song)
                 
-                if len(albums) < size:
-                    break
+                if len(albums) < size: break
                 offset += size
             except Exception as e:
                 logger.error(f"Ошибка при получении списка альбомов: {e}", exc_info=True)
@@ -101,16 +93,21 @@ class SyncAgent:
         return songs
 
     def _process_song(self, song):
-        # 1. Текущие данные с сервера (0-5)
         srv_starred = 1 if getattr(song, 'starred', None) else 0
         srv_rating = getattr(song, 'user_rating', 0) or 0
 
-        # 2. Формируем путь
         if not hasattr(song, 'path') or not song.path:
             logger.warning(f"Трек {song.id} не имеет атрибута path. Пропуск.")
             return
 
-        file_path = os.path.join(self.config['music_folder'], song.path)
+        # 1. Декодируем URL (если Navidrome передал %20 и т.д.) и убираем начальный слеш
+        relative_path = unquote(song.path).lstrip('/')
+        
+        # 2. Склеиваем базовую папку и относительный путь, нормализуем слеши
+        base_folder = self.config['music_folder'].rstrip('/')
+        file_path = os.path.normpath(os.path.join(base_folder, relative_path))
+        
+        # 3. КРИТИЧЕСКАЯ ПРОВЕРКА существования файла
         if not os.path.exists(file_path):
             logger.warning(f"Файл не найден на диске: {file_path}")
             return
@@ -124,7 +121,6 @@ class SyncAgent:
                 'server_starred': None, 'server_rating': None
             }
 
-        # 3. Читаем теги файла только если mtime изменилось
         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
             f_starred = ratings.get_starred_from_file(file_path)
             f_rating_internal = ratings.get_rating_from_file(file_path)
@@ -132,12 +128,10 @@ class SyncAgent:
             f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
             f_rating_internal = db_state['file_rating']
 
-        # Конвертация шкалы файла (1-10) в шкалу сервера (0-5)
         f_rating_os = 0
         if f_rating_internal is not None and f_rating_internal > 0:
             f_rating_os = round(f_rating_internal / 2)
 
-        # 4. МАТРИЦА РЕШЕНИЙ
         t_star, w_file_star, w_srv_star = self._resolve_conflict(
             srv_starred, f_starred, db_state['server_starred'], db_state['file_starred']
         )
@@ -150,7 +144,6 @@ class SyncAgent:
         write_file = w_file_star or w_file_rate
         write_server = w_srv_star or w_srv_rate
 
-        # 5. Применение изменений
         if self.config.get('dry_run', False):
             logger.info(f"[DRY-RUN] Трек {song.id}: Пишем файл={write_file}, Пишем сервер={write_server}")
         else:
@@ -164,7 +157,6 @@ class SyncAgent:
                         current_mtime = os.stat(file_path).st_mtime_ns
                     
                     if write_server:
-                        # Правильные сигнатуры методов star/unstar (sids вместо id)
                         if t_star == 1 and srv_starred == 0: 
                             self.conn.star(sids=[song.id])
                         elif t_star == 0 and srv_starred == 1: 
@@ -175,7 +167,6 @@ class SyncAgent:
                 logger.error(f"Ошибка блокировки/записи для {song.id}: {e}", exc_info=True)
                 return
 
-        # 6. Сохраняем финальное состояние в БД
         final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
         upsert_track_state(
             song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
@@ -184,7 +175,6 @@ class SyncAgent:
         )
 
     def _resolve_conflict(self, srv_val, f_val, db_srv_val, db_f_val):
-        """Универсальная матрица решений. Возвращает (target_value, write_file, write_server)"""
         srv_val = 0 if srv_val is None else srv_val
         f_val = 0 if f_val is None else f_val
         db_srv_val = 0 if db_srv_val is None else db_srv_val
@@ -195,21 +185,16 @@ class SyncAgent:
 
         if not srv_changed and not f_changed:
             return srv_val, False, False
-        
         if srv_changed and not f_changed:
             return srv_val, True, False
-        
         if not srv_changed and f_changed:
             return f_val, False, True
-        
         if srv_changed and f_changed:
             if srv_val == f_val: 
                 return srv_val, False, False
-            
             conflict_res = self.config.get('conflict_resolution', 'server_wins')
             if conflict_res == 'server_wins':
                 return srv_val, True, False
             elif conflict_res == 'file_wins':
                 return f_val, False, True
-        
         return srv_val, False, False
