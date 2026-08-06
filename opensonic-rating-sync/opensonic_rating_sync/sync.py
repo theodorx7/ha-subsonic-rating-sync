@@ -28,7 +28,7 @@ class SyncAgent:
         conn_kwargs = {
             'base_url': base_url,
             'port': config['server_port'],
-            'app_name': "ha-subsonic-rating-sync"
+            'app_name': "Rating Sync Agent"
         }
 
         if api_key:
