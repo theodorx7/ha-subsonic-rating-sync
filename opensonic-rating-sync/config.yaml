@@ -17,7 +17,7 @@ map:
 
 options:
   server_protocol: "https"
-  server_host: ""
+  server_host: null
   server_port: "4533"
   user: "fedor"
   password: ""
