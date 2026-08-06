@@ -8,7 +8,7 @@ logger = setup_logger()
 
 def main():
     config = {
-        'server_protocol': os.environ.get('SERVER_PROTOCOL', 'http'),
+        'server_protocol': os.environ.get('SERVER_PROTOCOL', '').strip(),
         'server_host': os.environ.get('SERVER_HOST', '').strip(),
         'server_port': int(os.environ.get('SERVER_PORT') or 4533),
         'user': os.environ.get('SERVER_USER', ''),
