@@ -103,26 +103,9 @@ class SyncAgent:
         relative_path = unquote(song.path).lstrip('/')
         
         # 2. Склеиваем базовую папку и относительный путь, нормализуем слеши
-        # Добавил .strip() на случай, если в конфиге есть лишние пробелы
-        base_folder = str(self.config.get('music_folder', '')).strip().rstrip('/')
+        base_folder = self.config['music_folder'].rstrip('/')
         file_path = os.path.normpath(os.path.join(base_folder, relative_path))
         
-        # --- ОТЛАДКА ДОСТУПА К ДИСКУ ---
-        # Проверяем, видит ли аддон вообще папку /media
-        if not hasattr(self, '_media_checked'):
-            self._media_checked = True
-            if os.path.exists("/media"):
-                logger.info(f"[ОТЛАДКА] Папка /media доступна. Содержимое: {os.listdir('/media')}")
-            else:
-                logger.error("[ОТЛАДКА] Папка /media НЕ доступна! В config.yaml аддона не указано map: media:rw")
-                
-            # Проверяем базовую папку
-            if os.path.exists(base_folder):
-                logger.info(f"[ОТЛАДКА] Базовая папка {base_folder} доступна. Содержимое: {os.listdir(base_folder)}")
-            else:
-                logger.error(f"[ОТЛАДКА] Базовая папка {base_folder} НЕ доступна!")
-        # ---------------------------------
-
         # 3. КРИТИЧЕСКАЯ ПРОВЕРКА существования файла
         if not os.path.exists(file_path):
             logger.warning(f"Файл не найден на диске: {file_path}")
