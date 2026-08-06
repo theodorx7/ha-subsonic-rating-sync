@@ -52,15 +52,14 @@ class SyncAgent:
             raise
 
     def _track_label(self, song, file_path=None):
-        """Формирует строку вида: ID | Artist - Title | Filename"""
+        """Формирует строку вида: Artist - Title | Filename"""
         artist = getattr(song, 'artist', None) or ""
         title = getattr(song, 'title', None) or "<без названия>"
         artist_title = f"{artist} - {title}" if artist else title
         
-        # Если file_path передан, берем имя файла. Иначе пытаемся взять путь из API.
         name = os.path.basename(file_path) if file_path else getattr(song, 'path', None) or "<нет пути>"
         
-        return f"{song.id} | {artist_title} | {name}"
+        return f"{artist_title} | {name}"
 
     def run_sync(self):
         logger.info("Начало цикла синхронизации...")
