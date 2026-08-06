@@ -221,13 +221,7 @@ class SyncAgent:
                 f"[DRY-RUN] ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
                 f"{self._track_label(song, file_path)}"
             )
-            
-            # Добавлен вывод текущих считанных значений для отладки
-            logger.info(
-                f"[DRY-RUN] Трек {song.id} — Обновляем файл={wf_str}, Обновляем сервер={ws_str} — "
-                f"Сервер(★:{srv_starred}/Рейтинг:{srv_rating}) | Файл(★:{f_starred}/Рейтинг:{f_rating_os}) — "
-                f"{self._track_label(song, file_path)}"
-            )
+
         else:
             lock = get_file_lock(song.id)
             try:
