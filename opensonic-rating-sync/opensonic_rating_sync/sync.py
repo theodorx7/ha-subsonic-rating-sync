@@ -181,13 +181,9 @@ class SyncAgent:
         write_server = w_srv_star or w_srv_rate
 
         if self.config.get('dry_run', False):
-            # ANSI-коды для цветов
-            GREEN = "\033[92m"
-            RESET = "\033[0m"
-            
-            # Форматируем статус с цветом
-            wf_str = f"{GREEN}TRUE{RESET}" if write_file else "FALSE"
-            ws_str = f"{GREEN}TRUE{RESET}" if write_server else "FALSE"
+            # Используем эмодзи, так как веб-интерфейс HA не поддерживает ANSI-цвета
+            wf_str = "🟢 TRUE" if write_file else "⚪ FALSE"
+            ws_str = "🟢 TRUE" if write_server else "⚪ FALSE"
             
             logger.info(
                 f"[DRY-RUN] Трек {song.id} — Обновляем файл={wf_str}, Обновляем сервер={ws_str} — "
