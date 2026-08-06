@@ -21,12 +21,6 @@ def main():
         'dry_run': os.environ.get('DRY_RUN', 'false').lower() == 'true'
     }
 
-    # Проверка обязательного поля server_host
-    if not config['server_host']:
-        error_msg = "Поле "Адрес сервера" обязательно для заполнения, перейдите в настройки оддона и заполните обязательные поля!"
-        logger.error(error_msg)
-        sys.exit(1) # Завершаем работу аддона с кодом ошибки
-    
     logger.info("Инициализация БД...")
     init_db()
     
