@@ -64,33 +64,58 @@ class SyncAgent:
         logger.info("Цикл синхронизации завершен.")
 
     def _fetch_all_server_songs(self):
-        songs = []
-        offset = 0
-        size = 500
-        mf_id = self.config.get('music_folder_id') or None
-        
-        while True:
+            """
+            Сканирует медиатеку по ФАЙЛОВОЙ СТРУКТУРЕ (через get_music_directory), 
+            чтобы получить реальные пути на диске, а не виртуальные пути из ID3-тегов.
+            """
+            songs = []
+            mf_id = self.config.get('music_folder_id') or None
+            
             try:
-                albums = self.conn.get_album_list(
-                    ltype="alphabeticalByName", 
-                    size=size, 
-                    offset=offset,
-                    music_folder_id=mf_id
-                )
-                if not albums: break
-                
-                for album in albums:
-                    album_data = self.conn.get_album(album.id)
-                    if album_data and hasattr(album_data, 'song') and album_data.song:
-                        songs.extend(album_data.song)
-                
-                if len(albums) < size: break
-                offset += size
+                # 1. Получаем корневую структуру папок (Indexes)
+                indexes = self.conn.get_indexes(music_folder_id=mf_id)
             except Exception as e:
-                logger.error(f"Ошибка при получении списка альбомов: {e}", exc_info=True)
-                break
-                
-        return songs
+                logger.error(f"Ошибка получения корневых индексов (папок): {e}")
+                return songs
+    
+            # Очередь ID папок для рекурсивного сканирования
+            folders_to_scan = []
+    
+            # В Subsonic API папки верхнего уровня группируются в алфавитный index (A-Z) -> artist
+            if hasattr(indexes, 'index'):
+                for idx in indexes.index:
+                    if hasattr(idx, 'artist'):
+                        for artist in idx.artist:
+                            folders_to_scan.append(artist.id)
+            
+            # Также файлы и папки могут лежать прямо в корне вне алфавитного индекса
+            if hasattr(indexes, 'child'):
+                for child in indexes.child:
+                    if getattr(child, 'is_dir', getattr(child, 'isDir', False)):
+                        folders_to_scan.append(child.id)
+                    else:
+                        songs.append(child)
+    
+            # 2. Обходим файловое дерево в ширину
+            while folders_to_scan:
+                current_folder_id = folders_to_scan.pop(0)
+                try:
+                    # Получаем содержимое конкретной физической папки
+                    directory = self.conn.get_music_directory(current_folder_id)
+                    
+                    if hasattr(directory, 'child'):
+                        for child in directory.child:
+                            # Если это папка — добавляем в очередь на сканирование
+                            if getattr(child, 'is_dir', getattr(child, 'isDir', False)):
+                                folders_to_scan.append(child.id)
+                            else:
+                                # Это аудиофайл. Здесь child.path — это ГАРАНТИРОВАННО 
+                                # реальный физический путь на диске!
+                                songs.append(child)
+                except Exception as e:
+                    logger.error(f"Ошибка при сканировании директории {current_folder_id}: {e}")
+    
+            return songs
 
     def _process_song(self, song):
         srv_starred = 1 if getattr(song, 'starred', None) else 0
