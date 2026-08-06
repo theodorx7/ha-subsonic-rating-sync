@@ -9,12 +9,12 @@ logger = setup_logger()
 def main():
     config = {
         'server_protocol': os.environ.get('SERVER_PROTOCOL', 'http'),
-        'server_host': os.environ.get('SERVER_HOST', 'localhost'),
+        'server_host': os.environ.get('SERVER_HOST', '').strip(),
         'server_port': int(os.environ.get('SERVER_PORT') or 4533),
         'user': os.environ.get('SERVER_USER', ''),
         'password': os.environ.get('SERVER_PASSWORD', ''),
         'api_key': os.environ.get('API_KEY', ''),
-        'music_folder': os.environ.get('MUSIC_FOLDER', '/music'),
+        'music_folder': os.environ.get('MUSIC_FOLDER', ''),
         'music_folder_id': os.environ.get('MUSIC_FOLDER_ID', ''),
         'sync_interval_minutes': int(os.environ.get('SYNC_INTERVAL') or 60),
         'conflict_resolution': os.environ.get('CONFLICT_RES', 'server_wins'),
