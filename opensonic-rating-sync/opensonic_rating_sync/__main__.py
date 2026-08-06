@@ -29,6 +29,7 @@ def load_config() -> dict:
         "api_key":              raw.get("api_key", ""),
         "music_folder":         raw.get("music_folder", ""),
         "music_folder_id":      raw.get("music_folder_id", ""),
+        "players":              raw.get("players", ["musicbee"]),  # <--- ДОБАВЛЕНО ЗДЕСЬ
         "sync_interval_minutes": int(raw.get("sync_interval_minutes") or 60),
         "conflict_resolution":  raw.get("conflict_resolution", ""),
         "dry_run":              bool(raw.get("dry_run", False)),
@@ -46,7 +47,7 @@ def validate(config: dict) -> None:
     if not config["server_host"]:
         logger.error(
             "Поле 'server_host' обязательно для заполнения. "
-            "Укажите адрес сервера Navidrome/Subsonic в настройках аддона."
+            "Укажите адрес сервера в настройках приложения."
         )
         sys.exit(1)
 
