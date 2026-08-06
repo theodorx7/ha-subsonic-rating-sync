@@ -17,10 +17,10 @@ map:
 
 options:
   server_protocol: "https"
-  server_host: null
+  server_host: "musicfx.duckdns.org"
   server_port: 4533
-  user: "fedor"
-  password: ""
+  user: "test"
+  password: "test"
   api_key: ""
   music_folder_id: "2"
   music_folder: ""
