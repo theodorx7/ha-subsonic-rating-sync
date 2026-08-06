@@ -20,9 +20,9 @@ _XIPH_FORMATS = {".flac": "FLAC", ".ogg": "OGG", ".opus": "OPUS"}
 _PLAYER_PROFILES = {
     'musicbee': {
         'popm_emails': ['musicbee@no.email', 'no@email'],
-        'like_mp3_desc': 'FMPS_Rating_User',
-        'like_vorbis': 'FMPS_RATING_USER',
-        'like_mp4': '----:com.apple.iTunes:FMPS_Rating_User'
+        'like_mp3_desc': 'TXXX:LOVE',
+        'like_vorbis': 'LOVE',
+        'like_mp4': '----:com.apple.iTunes:LOVE'
     },
     'plex': {
         'popm_emails': ['Plex'],
@@ -120,7 +120,7 @@ def _set_starred_to_id3(audio, starred):
         audio.tags.delall(f"TXXX:{desc}")
         
         if starred:
-            audio.tags.add(TXXX(encoding=3, desc=desc, text="1.0"))
+            audio.tags.add(TXXX(encoding=3, desc=desc, text="1"))
 
 # --- XIPH (FLAC, OGG, OPUS) ---
 def _get_rating_from_xiph(audio):
@@ -155,7 +155,7 @@ def _set_starred_to_xiph(audio, starred):
         if not starred and tag_name in audio:
             del audio[tag_name]
         elif starred:
-            audio[tag_name] = "1.0"
+            audio[tag_name] = "1"
 
 # --- M4A (AAC/ALAC) ---
 def _get_rating_from_m4a(audio):
@@ -194,7 +194,7 @@ def _set_starred_to_m4a(audio, starred):
         if not starred and tag_name in audio.tags:
             del audio.tags[tag_name]
         elif starred:
-            audio.tags[tag_name] = [b"1.0"]
+            audio.tags[tag_name] = [b"1"]
 
 # --- ЭКСПОРТИРУЕМЫЕ ФУНКЦИИ (ТОЧКА ВХОДА) ---
 def get_rating_from_file(file_path):
