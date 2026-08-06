@@ -9,7 +9,7 @@ logger = setup_logger()
 def main():
     config = {
         'server_protocol': os.environ.get('SERVER_PROTOCOL', ''),
-        'server_host': os.environ.get('SERVER_HOST', '').strip(),
+        'server_host': os.environ.get('SERVER_HOST', ''),
         'server_port': int(os.environ.get('SERVER_PORT') or 443),
         'user': os.environ.get('SERVER_USER', ''),
         'password': os.environ.get('SERVER_PASSWORD', ''),
