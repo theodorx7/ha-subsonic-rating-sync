@@ -22,7 +22,7 @@ options:
   user: "fedor"
   password: ""
   api_key: ""
-  music_folder_id: "1"
+  music_folder_id: "2"
   music_folder: "/media/MUSIC"
   sync_interval_minutes: 60
   conflict_resolution: "server_wins"
