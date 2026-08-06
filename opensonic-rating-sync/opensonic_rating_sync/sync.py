@@ -221,7 +221,6 @@ class SyncAgent:
                 f"[DRY-RUN] ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
                 f"{self._track_label(song, file_path)}"
             )
-
         else:
             lock = get_file_lock(song.id)
             try:
@@ -234,10 +233,8 @@ class SyncAgent:
                     
                     if write_server:
                         if t_star == 1 and srv_starred == 0: 
-                            # ИСПРАВЛЕНО 3: используем ids вместо sids
                             self.conn.star(ids=[song.id])
                         elif t_star == 0 and srv_starred == 1: 
-                            # ИСПРАВЛЕНО 3: используем ids вместо sids
                             self.conn.unstar(ids=[song.id])
                         if t_rate_os != srv_rating: 
                             self.conn.set_rating(song.id, t_rate_os)
@@ -245,12 +242,13 @@ class SyncAgent:
                 logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
                 return
 
-        final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
-        upsert_track_state(
-            song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-            f_starred=t_star, f_rating=final_f_rating,
-            s_starred=t_star, s_rating=t_rate_os
-        )
+            # ИСПРАВЛЕНО: Обновляем БД только при реальной записи!
+            final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
+            upsert_track_state(
+                song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
+                f_starred=t_star, f_rating=final_f_rating,
+                s_starred=t_star, s_rating=t_rate_os
+            )
 
     def _resolve_conflict(self, srv_val, f_val, db_srv_val, db_f_val):
         srv_val = 0 if srv_val is None else srv_val
