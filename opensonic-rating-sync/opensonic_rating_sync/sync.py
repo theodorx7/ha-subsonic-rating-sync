@@ -72,14 +72,21 @@ class SyncAgent:
         server_songs = self._fetch_all_server_songs()
         logger.info(f"Найдено треков на сервере: {len(server_songs)}")
         
+        disk_updates = 0
+        server_updates = 0
+        
         for song in server_songs:
             try:
                 # Передаем множество starred_ids для точного определения лайка
-                self._process_song(song, starred_ids)
+                u_file, u_server = self._process_song(song, starred_ids)
+                if u_file: disk_updates += 1
+                if u_server: server_updates += 1
             except Exception as e:
                 logger.error(f"Ошибка при обработке трека {self._track_label(song)}: {e}", exc_info=True)
 
-        logger.info("Цикл синхронизации завершен.")
+        logger.info(f"Цикл синхронизации завершен:")
+        logger.info(f"   -  Обновлено {disk_updates} файлов на ДИСКЕ")
+        logger.info(f"   -  Обновлено {server_updates} файлов на СЕРВЕРЕ")
 
     def _fetch_starred_ids(self):
         """
@@ -157,15 +164,12 @@ class SyncAgent:
         return f"{heart}/{stars}".strip("/")
     
     def _process_song(self, song, starred_ids):
-        # ИСПРАВЛЕНО 1: Проверяем наличие ID трека в множестве starred_ids
         srv_starred = 1 if song.id in starred_ids else 0
-        
-        # ИСПРАВЛЕНО 2: camelCase вместо snake_case. Добавлен fallback на всякий случай.
         srv_rating = getattr(song, 'userRating', getattr(song, 'user_rating', 0)) or 0
     
         if not getattr(song, 'path', None):
             logger.warning(f"Трек {song.id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
-            return
+            return False, False
     
         raw_path = unquote(song.path)
         if os.path.isabs(raw_path):
@@ -174,12 +178,12 @@ class SyncAgent:
             base_folder = self.config.get('music_folder', '').strip()
             if not base_folder:
                 logger.warning(f"Трек {self._track_label(song)}: Сервер вернул относительный путь ('{raw_path}'), но опция 'music_folder' не настроена в аддоне. Синхронизация этого файла невозможна. Пропуск.")
-                return
+                return False, False
             file_path = os.path.normpath(os.path.join(base_folder, raw_path.lstrip('/')))
     
         if not os.path.exists(file_path):
             logger.warning(f"Файл не найден на диске: {file_path} (Трек: {self._track_label(song)})")
-            return
+            return False, False
 
         current_mtime = os.stat(file_path).st_mtime_ns
         db_state = get_track_state(song.id)
@@ -213,42 +217,54 @@ class SyncAgent:
         write_file = w_file_star or w_file_rate
         write_server = w_srv_star or w_srv_rate
 
-        if self.config.get('dry_run', False):
-            wf_str = self._get_action_str(write_file, t_star, t_rate_os)
-            ws_str = self._get_action_str(write_server, t_star, t_rate_os)
-            
-            logger.info(
-                f"[DRY-RUN] ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
-                f"{self._track_label(song, file_path)}"
-            )
-        else:
-            lock = get_file_lock(song.id)
-            try:
-                with lock:
-                    if write_file:
-                        t_rate_internal = t_rate_os * 2 if t_rate_os > 0 else 0
-                        ratings.set_starred_to_file(file_path, t_star)
-                        ratings.set_rating_to_file(file_path, t_rate_internal)
-                        current_mtime = os.stat(file_path).st_mtime_ns
-                    
-                    if write_server:
-                        if t_star == 1 and srv_starred == 0: 
-                            self.conn.star(ids=[song.id])
-                        elif t_star == 0 and srv_starred == 1: 
-                            self.conn.unstar(ids=[song.id])
-                        if t_rate_os != srv_rating: 
-                            self.conn.set_rating(song.id, t_rate_os)
-            except Exception as e:
-                logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
-                return
+        # Если изменений нет — просто выходим, не засоряя логи
+        if not write_file and not write_server:
+            return False, False
 
-            # ИСПРАВЛЕНО: Обновляем БД только при реальной записи!
-            final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
-            upsert_track_state(
-                song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-                f_starred=t_star, f_rating=final_f_rating,
-                s_starred=t_star, s_rating=t_rate_os
-            )
+        # Формируем префикс лога и пишем инфо
+        prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
+        wf_str = self._get_action_str(write_file, t_star, t_rate_os)
+        ws_str = self._get_action_str(write_server, t_star, t_rate_os)
+        
+        logger.info(
+            f"{prefix}ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
+            f"{self._track_label(song, file_path)}"
+        )
+
+        # Если Dry-Run — на этом заканчиваем
+        if self.config.get('dry_run', False):
+            return write_file, write_server
+
+        # Боевой режим
+        lock = get_file_lock(song.id)
+        try:
+            with lock:
+                if write_file:
+                    t_rate_internal = t_rate_os * 2 if t_rate_os > 0 else 0
+                    ratings.set_starred_to_file(file_path, t_star)
+                    ratings.set_rating_to_file(file_path, t_rate_internal)
+                    current_mtime = os.stat(file_path).st_mtime_ns
+                
+                if write_server:
+                    if t_star == 1 and srv_starred == 0: 
+                        self.conn.star(ids=[song.id])
+                    elif t_star == 0 and srv_starred == 1: 
+                        self.conn.unstar(ids=[song.id])
+                    if t_rate_os != srv_rating: 
+                        self.conn.set_rating(song.id, t_rate_os)
+        except Exception as e:
+            logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
+            return False, False
+
+        # Обновляем БД только при реальной записи!
+        final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
+        upsert_track_state(
+            song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
+            f_starred=t_star, f_rating=final_f_rating,
+            s_starred=t_star, s_rating=t_rate_os
+        )
+        
+        return write_file, write_server
 
     def _resolve_conflict(self, srv_val, f_val, db_srv_val, db_f_val):
         srv_val = 0 if srv_val is None else srv_val
