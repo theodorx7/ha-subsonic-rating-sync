@@ -6,7 +6,7 @@ from .database import get_track_state, upsert_track_state
 from . import ratings
 import libopensonic
 
-logger = setup_logger()
+logger = logging.getLogger(__name__) 
 
 class SyncAgent:
     def __init__(self, config):
