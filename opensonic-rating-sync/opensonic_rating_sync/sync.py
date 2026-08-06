@@ -1,12 +1,13 @@
 import os
+import logging
 from urllib.parse import unquote
-from .logger import setup_logger
+
 from .locker import get_file_lock
 from .database import get_track_state, upsert_track_state
 from . import ratings
 import libopensonic
 
-logger = logging.getLogger(__name__) 
+logger = logging.getLogger(__name__)
 
 class SyncAgent:
     def __init__(self, config):
