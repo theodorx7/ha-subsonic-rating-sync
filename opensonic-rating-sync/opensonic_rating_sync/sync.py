@@ -124,7 +124,7 @@ class SyncAgent:
         srv_rating = getattr(song, 'user_rating', 0) or 0
     
         if not getattr(song, 'path', None):
-            logger.warning(f"Трек {self._track_label(song)} не имеет атрибута path. Пропуск.")
+            logger.warning(f"Трек {song.id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
             return
     
         # Navidrome с "Report Full Path" отдаёт АБСОЛЮТНЫЙ путь.
@@ -181,10 +181,17 @@ class SyncAgent:
         write_server = w_srv_star or w_srv_rate
 
         if self.config.get('dry_run', False):
-            # Заменено на вызов хэлпера
+            # ANSI-коды для цветов
+            GREEN = "\033[92m"
+            RESET = "\033[0m"
+            
+            # Форматируем статус с цветом
+            wf_str = f"{GREEN}TRUE{RESET}" if write_file else "FALSE"
+            ws_str = f"{GREEN}TRUE{RESET}" if write_server else "FALSE"
+            
             logger.info(
-                f"[DRY-RUN] Трек {self._track_label(song, file_path)}: "
-                f"Пишем файл={write_file}, Пишем сервер={write_server}"
+                f"[DRY-RUN] Трек {song.id} — Обновляем файл={wf_str}, Обновляем сервер={ws_str} — "
+                f"{self._track_label(song, file_path)}"
             )
         else:
             lock = get_file_lock(song.id)
@@ -205,7 +212,7 @@ class SyncAgent:
                             self.conn.set_rating(song.id, t_rate_os)
             except Exception as e:
                 # Заменено на вызов хэлпера
-                logger.error(f"Ошибка блокировки/записи для трека {self._track_label(song, file_path)}: {e}", exc_info=True)
+                logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
                 return
 
         final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
