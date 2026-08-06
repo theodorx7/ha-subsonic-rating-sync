@@ -22,7 +22,7 @@ def load_config() -> dict:
 
     return {
         "server_protocol":      raw.get("server_protocol", ""),
-        "server_host":          str(raw.get("server_host", "")).strip(),
+        "server_host": str(raw.get("server_host") or "").strip(),
         "server_port":          int(raw.get("server_port") or 443),
         "user":                 raw.get("user", ""),
         "password":             raw.get("password", ""),
