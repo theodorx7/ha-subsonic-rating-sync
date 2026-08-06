@@ -64,41 +64,57 @@ class SyncAgent:
         logger.info("Цикл синхронизации завершен.")
 
     def _fetch_all_server_songs(self):
-        """
-        Получаем треки через физическую файловую структуру (getMusicDirectory),
-        а не через альбомы, чтобы избежать виртуальных путей из тегов.
-        """
-        songs = []
-        mf_id = self.config.get('music_folder_id') or None
-        
-        if not mf_id:
-            logger.error("Не указан music_folder_id в настройках оддона!")
-            return songs
+            """
+            Сканирует медиатеку по файловой структуре через get_indexes и get_music_directory 
+            с защитой от NoneType элементов.
+            """
+            songs = []
+            mf_id = self.config.get('music_folder_id') or None
             
-        logger.info(f"Запрос физической структуры папок для библиотеки ID={mf_id}...")
-        self._scan_directory(mf_id, songs)
-        
-        return songs
-
-    def _scan_directory(self, dir_id, songs_list):
-        """Рекурсивный обход папок через Subsonic API."""
-        try:
-            # Используем getMusicDirectory вместо getAlbum
-            dir_data = self.conn.get_music_directory(dir_id)
-            if not dir_data or not hasattr(dir_data, 'child'):
-                return
-                
-            for child in dir_data.child:
-                # Если это папка (isDir=True), идем вглубь
-                if getattr(child, 'is_dir', False) or getattr(child, 'isDir', False):
-                    self._scan_directory(child.id, songs_list)
-                else:
-                    # Если это файл (трек) - добавляем в список
-                    # У таких объектов будет правильный физический атрибут path
-                    songs_list.append(child)
-                    
-        except Exception as e:
-            logger.error(f"Ошибка при сканировании директории {dir_id}: {e}", exc_info=True)
+            try:
+                indexes = self.conn.get_indexes(music_folder_id=mf_id)
+            except Exception as e:
+                logger.error(f"Ошибка получения корневых индексов (папок): {e}")
+                return songs
+    
+            if not indexes:
+                return songs
+    
+            folders_to_scan = []
+    
+            # 1. Безопасно проверяем алфавитные индексы артистов
+            if hasattr(indexes, 'index') and indexes.index:
+                for idx in indexes.index:
+                    if hasattr(idx, 'artist') and idx.artist:
+                        for artist in idx.artist:
+                            if hasattr(artist, 'id'):
+                                folders_to_scan.append(artist.id)
+            
+            # 2. Безопасно проверяем прямые дочерние элементы в корне (если они есть и не None)
+            if hasattr(indexes, 'child') and indexes.child:
+                for child in indexes.child:
+                    if child is not None:
+                        if getattr(child, 'is_dir', getattr(child, 'isDir', False)):
+                            folders_to_scan.append(child.id)
+                        else:
+                            songs.append(child)
+    
+            # 3. Рекурсивный обход дерева папок
+            while folders_to_scan:
+                current_folder_id = folders_to_scan.pop(0)
+                try:
+                    directory = self.conn.get_music_directory(current_folder_id)
+                    if directory and hasattr(directory, 'child') and directory.child:
+                        for child in directory.child:
+                            if child is not None:
+                                if getattr(child, 'is_dir', getattr(child, 'isDir', False)):
+                                    folders_to_scan.append(child.id)
+                                else:
+                                    songs.append(child)
+                except Exception as e:
+                    logger.error(f"Ошибка при сканировании директории {current_folder_id}: {e}")
+    
+            return songs
 
     def _process_song(self, song):
         srv_starred = 1 if getattr(song, 'starred', None) else 0
