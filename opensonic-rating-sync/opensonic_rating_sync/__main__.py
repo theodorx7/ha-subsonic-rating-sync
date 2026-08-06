@@ -17,7 +17,7 @@ def main():
         'music_folder': os.environ.get('MUSIC_FOLDER', ''),
         'music_folder_id': os.environ.get('MUSIC_FOLDER_ID', ''),
         'sync_interval_minutes': int(os.environ.get('SYNC_INTERVAL') or 60),
-        'conflict_resolution': os.environ.get('CONFLICT_RES', 'server_wins'),
+        'conflict_resolution': os.environ.get('CONFLICT_RES', ''),
         'dry_run': os.environ.get('DRY_RUN', 'false').lower() == 'true'
     }
     
