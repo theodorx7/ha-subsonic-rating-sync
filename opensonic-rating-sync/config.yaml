@@ -17,7 +17,7 @@ map:
 
 options:
   server_protocol: "https"
-  server_host: "musicfx.duckdns.org"
+  server_host: "http://musicfx.duckdns.org"
   server_port: 4533
   user: "test"
   password: "test"
