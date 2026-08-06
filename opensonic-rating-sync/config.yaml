@@ -40,7 +40,7 @@ schema:
   music_folder_id: str
   music_folder: str?
   players:
-    - list(musicbee|plex|mediamonkey|navidrome)
+    - list(musicbee|plex|mediamonkey|navidrome|foobar2000|wmp)
   sync_interval_minutes: int?
   conflict_resolution: list(server_wins|file_wins)
   dry_run: bool
