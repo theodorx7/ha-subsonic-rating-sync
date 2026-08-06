@@ -23,7 +23,7 @@ options:
   password: ""
   api_key: ""
   music_folder_id: "2"
-  music_folder: "/media/MUSIC"
+  music_folder: "/media/MUSIC/test"
   sync_interval_minutes: 60
   conflict_resolution: "server_wins"
   dry_run: true
