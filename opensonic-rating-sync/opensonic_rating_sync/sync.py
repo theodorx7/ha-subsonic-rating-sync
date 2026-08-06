@@ -141,6 +141,21 @@ class SyncAgent:
             
         return songs
 
+    def _get_action_str(self, do_write, star_val, rate_val):
+        """Форматирует строку действий для логов DRY-RUN"""
+        if not do_write:
+            return "FALSE"
+        
+        heart = "❤️" if star_val == 1 else ""
+        stars = "⭐" * rate_val if rate_val > 0 else ""
+        
+        # Если мы очищаем и лайк, и рейтинг
+        if not heart and not stars:
+            return "❌ (Сброс)"
+            
+        # Склеиваем сердце и звезды. Если сердца нет, slash удалится автоматически
+        return f"{heart}/{stars}".strip("/")
+    
     def _process_song(self, song, starred_ids):
         # ИСПРАВЛЕНО 1: Проверяем наличие ID трека в множестве starred_ids
         srv_starred = 1 if song.id in starred_ids else 0
@@ -199,8 +214,13 @@ class SyncAgent:
         write_server = w_srv_star or w_srv_rate
 
         if self.config.get('dry_run', False):
-            wf_str = "🟢 TRUE" if write_file else "⚪ FALSE"
-            ws_str = "🟢 TRUE" if write_server else "⚪ FALSE"
+            wf_str = self._get_action_str(write_file, t_star, t_rate_os)
+            ws_str = self._get_action_str(write_server, t_star, t_rate_os)
+            
+            logger.info(
+                f"[DRY-RUN] ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
+                f"{self._track_label(song, file_path)}"
+            )
             
             # Добавлен вывод текущих считанных значений для отладки
             logger.info(
