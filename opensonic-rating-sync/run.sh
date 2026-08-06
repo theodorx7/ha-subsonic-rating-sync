@@ -3,18 +3,14 @@ set -e
 
 bashio::log.info "Starting Navidrome/Subsonic Rating Sync App..."
 
+# Экспортируем только PYTHONPATH, он нужен для поиска вашего пакета
 export PYTHONPATH="/app/"
 
-# Прокидываем опции из /data/options.json
-export SERVER_PROTOCOL="$(bashio::config 'server_protocol')"
-export SERVER_HOST="$(bashio::config 'server_host')"
-export SERVER_PORT="$(bashio::config 'server_port')"
-export SERVER_USER="$(bashio::config 'user')"
-export SERVER_PASSWORD="$(bashio::config 'password')"
-export MUSIC_FOLDER_ID="$(bashio::config 'music_folder_id')"
-export MUSIC_FOLDER="$(bashio::config 'music_folder')"
-export SYNC_INTERVAL="$(bashio::config 'sync_interval_minutes')"
-export CONFLICT_RES="$(bashio::config 'conflict_resolution')"
-export DRY_RUN="$(bashio::config 'dry_run')"
+# Страховочная проверка на уровне bash (опционально, но рекомендуется)
+# Если поле не заполнено, bashio сам завершит скрипт с понятной ошибкой
+# до того, как запустится Python
+bashio::config.require 'server_host'
 
+# Запускаем Python
+# Флаг -u отключает буферизацию, чтобы логи сразу летели в HA
 exec python3 -u -m opensonic_rating_sync
