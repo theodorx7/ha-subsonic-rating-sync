@@ -18,28 +18,28 @@ map:
 options:
   server_protocol: "https"
   server_host: ""
-  server_port: 4533
+  server_port: "4533"
   user: "fedor"
   password: ""
   api_key: ""
   music_folder_id: "2"
   music_folder: ""
   sync_interval_minutes: 60
-  conflict_resolution: ""
+  conflict_resolution: "server_wins"
   dry_run: true
   debug: true
 
 schema:
   server_protocol: list(https|http)
   server_host: str
-  server_port: int
+  server_port: int?
   user: str
   password: password
   api_key: password
   music_folder_id: str
   music_folder: str?
   sync_interval_minutes: int
-  conflict_resolution: match(^(server_wins|file_wins)$)
+  conflict_resolution: list(server_wins|file_wins)
   dry_run: bool
   debug: bool
   
