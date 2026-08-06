@@ -10,7 +10,7 @@ def main():
     config = {
         'server_protocol': os.environ.get('SERVER_PROTOCOL', '').strip(),
         'server_host': os.environ.get('SERVER_HOST', '').strip(),
-        'server_port': int(os.environ.get('SERVER_PORT') or 4533),
+        'server_port': int(os.environ.get('SERVER_PORT', ''),
         'user': os.environ.get('SERVER_USER', ''),
         'password': os.environ.get('SERVER_PASSWORD', ''),
         'api_key': os.environ.get('API_KEY', ''),
