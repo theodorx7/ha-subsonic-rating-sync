@@ -2,8 +2,9 @@ import logging
 import sys
 
 def setup_logger():
-    """Инициализация логгера для HA Add-on."""
-    logger = logging.getLogger("starsync")
+    """Инициализация корневого логгера для HA Add-on."""
+    # Получаем корневой логгер приложения
+    logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     
     # Предотвращаем дублирование хендлеров при перезапуске
@@ -11,7 +12,8 @@ def setup_logger():
         # Единственный хендлер — вывод в консоль (stdout).
         # Home Assistant перехватывает этот поток и показывает в своем интерфейсе.
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        # Добавили %(name)s, чтобы видеть, из какого файла пришло сообщение (например sync.py)
+        console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         logger.addHandler(console_handler)
             
     return logger
