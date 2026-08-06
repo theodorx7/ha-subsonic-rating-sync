@@ -12,8 +12,8 @@ def setup_logger():
         # Единственный хендлер — вывод в консоль (stdout).
         # Home Assistant перехватывает этот поток и показывает в своем интерфейсе.
         console_handler = logging.StreamHandler(sys.stdout)
-        # Добавили %(name)s, чтобы видеть, из какого файла пришло сообщение (например sync.py)
-        console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        # Убрали %(name)s и %(levelname)s, чтобы лог был чистым
+        console_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
         logger.addHandler(console_handler)
             
     return logger
