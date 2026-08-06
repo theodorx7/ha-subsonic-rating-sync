@@ -20,9 +20,9 @@ _XIPH_FORMATS = {".flac": "FLAC", ".ogg": "OGG", ".opus": "OPUS"}
 _PLAYER_PROFILES = {
     'musicbee': {
         'popm_emails': ['musicbee@no.email', 'no@email'],
-        'like_mp3_desc': 'TXXX:LOVE',
-        'like_vorbis': 'LOVE RATING',
-        'like_mp4': '----:com.apple.iTunes:LOVE'
+        'like_mp3_desc': 'LOVE RATING',                 # ИСПРАВЛЕНО: С пробелом
+        'like_vorbis': 'LOVE RATING',                   # ИСПРАВЛЕНО: С пробелом
+        'like_mp4': '----:com.apple.iTunes:LOVERATING'  # ИСПРАВЛЕНО: Без пробела
     },
     'plex': {
         'popm_emails': ['no@email', 'Plex'],
@@ -108,7 +108,8 @@ def _get_starred_from_id3(audio):
     for player in _ACTIVE_PLAYERS:
         desc = _PLAYER_PROFILES[player]['like_mp3_desc']
         fav_frames = audio.tags.getall(f"TXXX:{desc}")
-        if fav_frames and str(fav_frames[0].text[0]) in ("1", "1.0"):
+        # ИСПРАВЛЕНО: Добавлено распознавание "L" для MusicBee
+        if fav_frames and str(fav_frames[0].text[0]) in ("1", "1.0", "L"):
             return 1
     return 0
 
@@ -120,12 +121,13 @@ def _set_starred_to_id3(audio, starred):
         audio.tags.delall(f"TXXX:{desc}")
         
         if starred:
-            audio.tags.add(TXXX(encoding=3, desc=desc, text="L"))
+            # ИСПРАВЛЕНО: Для MusicBee пишем 'L', для остальных '1'
+            val = "L" if player == 'musicbee' else "1"
+            audio.tags.add(TXXX(encoding=3, desc=desc, text=val))
 
 # --- XIPH (FLAC, OGG, OPUS) ---
 def _get_rating_from_xiph(audio):
     if not audio: return None
-    # Убран лишний цикл по игрокам, т.к. тег RATING стандарен для Vorbis
     rating_raw = audio.get("RATING")
     if rating_raw:
         xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
@@ -145,7 +147,8 @@ def _get_starred_from_xiph(audio):
     if not audio: return 0
     for player in _ACTIVE_PLAYERS:
         tag_name = _PLAYER_PROFILES[player]['like_vorbis']
-        if tag_name in audio and str(audio[tag_name][0]) in ("1", "1.0"):
+        # ИСПРАВЛЕНО: Добавлено распознавание "L" для MusicBee
+        if tag_name in audio and str(audio[tag_name][0]) in ("1", "1.0", "L"):
             return 1
     return 0
 
@@ -155,12 +158,12 @@ def _set_starred_to_xiph(audio, starred):
         if not starred and tag_name in audio:
             del audio[tag_name]
         elif starred:
-            audio[tag_name] = "L"
+            # ИСПРАВЛЕНО: Для MusicBee пишем 'L', для остальных '1'
+            audio[tag_name] = "L" if player == 'musicbee' else "1"
 
 # --- M4A (AAC/ALAC) ---
 def _get_rating_from_m4a(audio):
     if not audio.tags: return None
-    # Убран лишний цикл, тег rate стандартен
     rating_raw = audio.tags.get("----:com.apple.iTunes:rate")
     if rating_raw:
         m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
@@ -170,7 +173,6 @@ def _get_rating_from_m4a(audio):
 
 def _set_rating_to_m4a(audio, internal_rating):
     if audio.tags is None: audio.add_tags()
-    # Приведено к единому регистру (с маленькой буквы, как стандарт iTunes)
     if "----:com.apple.iTunes:rate" in audio.tags:
         del audio.tags["----:com.apple.iTunes:rate"]
         
@@ -184,7 +186,8 @@ def _get_starred_from_m4a(audio):
         tag_name = _PLAYER_PROFILES[player]['like_mp4']
         if tag_name in audio.tags:
             val = audio.tags[tag_name][0].decode('utf-8')
-            if val in ("1", "1.0"):
+            # ИСПРАВЛЕНО: Добавлено распознавание "L" для MusicBee
+            if val in ("1", "1.0", "L"):
                 return 1
     return 0
 
@@ -194,7 +197,9 @@ def _set_starred_to_m4a(audio, starred):
         if not starred and tag_name in audio.tags:
             del audio.tags[tag_name]
         elif starred:
-            audio.tags[tag_name] = [b"L"]
+            # ИСПРАВЛЕНО: Для MusicBee пишем b'L', для остальных b'1'
+            val = b"L" if player == 'musicbee' else b"1"
+            audio.tags[tag_name] = [val]
 
 # --- ЭКСПОРТИРУЕМЫЕ ФУНКЦИИ (ТОЧКА ВХОДА) ---
 def get_rating_from_file(file_path):
