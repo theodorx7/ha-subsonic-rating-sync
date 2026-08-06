@@ -17,9 +17,6 @@ _AIFF_FORMATS = {".aif": "AIFF", ".aiff": "AIFF"}
 _XIPH_FORMATS = {".flac": "FLAC", ".ogg": "OGG", ".opus": "OPUS"}
 
 # --- ПРОФИЛИ ПЛЕЕРОВ ---
-# Указываем, какие emails для POPM использует плеер, и какие текстовые теги для лайков.
-# MusicBee использует FMPS_Rating_User = 1.0 для "Love"
-# Plex/Navidrome используют FAVORITE = 1 для "Star"
 _PLAYER_PROFILES = {
     'musicbee': {
         'popm_emails': ['musicbee@no.email', 'no@email'],
@@ -35,7 +32,7 @@ _PLAYER_PROFILES = {
     },
     'mediamonkey': {
         'popm_emails': ['MediaMonkey', 'no@email'],
-        'like_mp3_desc': 'FAVORITE', # MM не имеет жесткого стандарта для лайка в файлах, используем FAVORITE
+        'like_mp3_desc': 'FAVORITE',
         'like_vorbis': 'FAVORITE',
         'like_mp4': '----:com.apple.iTunes:FAVORITE'
     },
@@ -47,7 +44,7 @@ _PLAYER_PROFILES = {
     }
 }
 
-_ACTIVE_PLAYERS = ['musicbee'] # По умолчанию, перезаписывается из sync.py
+_ACTIVE_PLAYERS = ['musicbee']
 
 def set_active_players(players_list):
     global _ACTIVE_PLAYERS
@@ -57,7 +54,6 @@ def set_active_players(players_list):
 # --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ РЕЙТИНГА ---
 def _popm_rating_to_internal(popm_rating, email=None):
     if popm_rating == 0 or popm_rating is None: return None
-    # Проверяем по известным картам
     for internal_rating, popm_value in _PRIMARY_MP3_RATING_MAP.items():
         if popm_rating == popm_value: return internal_rating
     for map_to_try in [_ALTERNATIVE_MP3_RATING_MAP, _PICARD_MP3_RATING_MAP]:
@@ -75,7 +71,6 @@ def _get_rating_from_id3(audio):
     popm_frames = audio.tags.getall("POPM")
     if not popm_frames: return None
     
-    # Ищем только по активным плеерам!
     for player in _ACTIVE_PLAYERS:
         for email in _PLAYER_PROFILES[player]['popm_emails']:
             frame = next((f for f in popm_frames if f.email == email), None)
@@ -86,15 +81,12 @@ def _get_rating_from_id3(audio):
 def _set_rating_to_id3(audio, internal_rating):
     if audio.tags is None: audio.tags = ID3()
     
-    # Удаляем и перезаписываем только для активных плееров
     for player in _ACTIVE_PLAYERS:
         for email in _PLAYER_PROFILES[player]['popm_emails']:
-            # Удаляем старые фреймы этого плеера
             existing = [f for f in audio.tags.getall("POPM") if f.email == email]
             for f in existing:
                 audio.tags.remove(f)
             
-            # Если рейтинг > 0, добавляем новый
             if internal_rating is not None and internal_rating > 0:
                 popm_val = _internal_rating_to_popm(internal_rating)
                 audio.tags.add(POPM(email=email, rating=popm_val, count=0))
@@ -113,25 +105,24 @@ def _set_starred_to_id3(audio, starred):
     
     for player in _ACTIVE_PLAYERS:
         desc = _PLAYER_PROFILES[player]['like_mp3_desc']
-        audio.tags.delall(f"TXXX:{desc}") # Удаляем старый
+        audio.tags.delall(f"TXXX:{desc}")
         
         if starred:
-            audio.tags.add(TXXX(encoding=3, desc=desc, text="1.0")) # Пишем 1.0 для FMPS совместимости
+            audio.tags.add(TXXX(encoding=3, desc=desc, text="1.0"))
 
 # --- XIPH (FLAC, OGG, OPUS) ---
 def _get_rating_from_xiph(audio):
     if not audio: return None
-    for player in _ACTIVE_PLAYERS:
-        rating_raw = audio.get("RATING")
-        if rating_raw:
-            xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-            if xiph_rating > 0:
-                return max(1, min(10, round(xiph_rating / 10)))
+    # Убран лишний цикл по игрокам, т.к. тег RATING стандарен для Vorbis
+    rating_raw = audio.get("RATING")
+    if rating_raw:
+        xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+        if xiph_rating > 0:
+            return max(1, min(10, round(xiph_rating / 10)))
     return None
 
 def _set_rating_to_xiph(audio, internal_rating):
     if not audio: return
-    # Удаляем старые рейтинги
     if "RATING" in audio:
         del audio["RATING"]
         
@@ -157,23 +148,23 @@ def _set_starred_to_xiph(audio, starred):
 # --- M4A (AAC/ALAC) ---
 def _get_rating_from_m4a(audio):
     if not audio.tags: return None
-    for player in _ACTIVE_PLAYERS:
-        rating_raw = audio.tags.get("----:com.apple.iTunes:rate")
-        if rating_raw:
-            m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-            if m4a_rating > 0:
-                return max(1, min(10, round(m4a_rating / 10)))
+    # Убран лишний цикл, тег rate стандартен
+    rating_raw = audio.tags.get("----:com.apple.iTunes:rate")
+    if rating_raw:
+        m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+        if m4a_rating > 0:
+            return max(1, min(10, round(m4a_rating / 10)))
     return None
 
 def _set_rating_to_m4a(audio, internal_rating):
     if audio.tags is None: audio.add_tags()
-    # Удаляем старый
+    # Приведено к единому регистру (с маленькой буквы, как стандарт iTunes)
     if "----:com.apple.iTunes:rate" in audio.tags:
         del audio.tags["----:com.apple.iTunes:rate"]
         
     if internal_rating is not None and internal_rating > 0:
         m4a_rating = str(max(10, min(100, internal_rating * 10)))
-        audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
+        audio["----:com.apple.iTunes:rate"] = [m4a_rating.encode("utf-8")]
 
 def _get_starred_from_m4a(audio):
     if not audio.tags: return 0
