@@ -84,18 +84,19 @@ class SyncAgent:
     def _fetch_starred_ids(self):
         """
         Надежный способ получения избранных треков через getStarred2.
-        search3 с пустым запросом часто не возвращает поле starred.
+        Согласно OpenSubsonic API, возвращает только залайканные элементы.
         """
         starred_ids = set()
         try:
             mf_id = self.config.get('music_folder_id') or None
-            result = self.conn.getStarred2(music_folder_id=mf_id) if mf_id else self.conn.getStarred2()
+            
+            result = self.conn.get_starred2(music_folder_id=mf_id) if mf_id else self.conn.get_starred2()
             
             if result and result.song:
                 for s in result.song:
                     starred_ids.add(s.id)
         except Exception as e:
-            logger.error(f"Ошибка при получении избранных треков (getStarred2): {e}", exc_info=True)
+            logger.error(f"Ошибка при получении избранных треков (get_starred2): {e}", exc_info=True)
             
         return starred_ids
 
