@@ -51,6 +51,17 @@ class SyncAgent:
             logger.error(f"Ошибка подключения к Navidrome ({base_url}:{config['server_port']}): {e}")
             raise
 
+    def _track_label(self, song, file_path=None):
+        """Формирует строку вида: ID | Artist - Title | Filename"""
+        artist = getattr(song, 'artist', None) or ""
+        title = getattr(song, 'title', None) or "<без названия>"
+        artist_title = f"{artist} - {title}" if artist else title
+        
+        # Если file_path передан, берем имя файла. Иначе пытаемся взять путь из API.
+        name = os.path.basename(file_path) if file_path else getattr(song, 'path', None) or "<нет пути>"
+        
+        return f"{song.id} | {artist_title} | {name}"
+
     def run_sync(self):
         logger.info("Начало цикла синхронизации...")
         server_songs = self._fetch_all_server_songs()
@@ -60,7 +71,8 @@ class SyncAgent:
             try:
                 self._process_song(song)
             except Exception as e:
-                logger.error(f"Ошибка при обработке трека {getattr(song, 'id', 'Unknown')}: {e}", exc_info=True)
+                # Заменил getattr(song, 'id', 'Unknown') на вызов хэлпера
+                logger.error(f"Ошибка при обработке трека {self._track_label(song)}: {e}", exc_info=True)
 
         logger.info("Цикл синхронизации завершен.")
 
@@ -113,7 +125,7 @@ class SyncAgent:
         srv_rating = getattr(song, 'user_rating', 0) or 0
     
         if not getattr(song, 'path', None):
-            logger.warning(f"Трек {song.id} не имеет атрибута path. Пропуск.")
+            logger.warning(f"Трек {self._track_label(song)} не имеет атрибута path. Пропуск.")
             return
     
         # Navidrome с "Report Full Path" отдаёт АБСОЛЮТНЫЙ путь.
@@ -128,13 +140,13 @@ class SyncAgent:
             base_folder = self.config.get('music_folder', '').strip()
             
             if not base_folder:
-                logger.warning(f"Трек {song.id}: Сервер вернул относительный путь ('{raw_path}'), но опция 'music_folder' не настроена в аддоне. Синхронизация этого файла невозможна. Пропуск.")
+                logger.warning(f"Трек {self._track_label(song)}: Сервер вернул относительный путь ('{raw_path}'), но опция 'music_folder' не настроена в аддоне. Синхронизация этого файла невозможна. Пропуск.")
                 return
             
             file_path = os.path.normpath(os.path.join(base_folder, raw_path.lstrip('/')))
     
         if not os.path.exists(file_path):
-            logger.warning(f"Файл не найден на диске: {file_path} (path из API: {song.path})")
+            logger.warning(f"Файл не найден на диске: {file_path} (Трек: {self._track_label(song)})")
             return
 
         current_mtime = os.stat(file_path).st_mtime_ns
@@ -170,7 +182,11 @@ class SyncAgent:
         write_server = w_srv_star or w_srv_rate
 
         if self.config.get('dry_run', False):
-            logger.info(f"[DRY-RUN] Трек {song.id}: Пишем файл={write_file}, Пишем сервер={write_server}")
+            # Заменено на вызов хэлпера
+            logger.info(
+                f"[DRY-RUN] Трек {self._track_label(song, file_path)}: "
+                f"Пишем файл={write_file}, Пишем сервер={write_server}"
+            )
         else:
             lock = get_file_lock(song.id)
             try:
@@ -189,7 +205,8 @@ class SyncAgent:
                         if t_rate_os != srv_rating: 
                             self.conn.set_rating(song.id, t_rate_os)
             except Exception as e:
-                logger.error(f"Ошибка блокировки/записи для {song.id}: {e}", exc_info=True)
+                # Заменено на вызов хэлпера
+                logger.error(f"Ошибка блокировки/записи для трека {self._track_label(song, file_path)}: {e}", exc_info=True)
                 return
 
         final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
