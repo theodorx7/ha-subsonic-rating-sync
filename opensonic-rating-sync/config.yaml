@@ -32,7 +32,7 @@ options:
 schema:
   server_protocol: list(https|http)
   server_host: str
-  server_port: int?
+  server_port: int
   user: str
   password: password
   api_key: password
