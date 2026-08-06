@@ -17,7 +17,7 @@ map:
 
 options:
   server_protocol: "https"
-  server_host: "localhost"
+  server_host: ""
   server_port: 4533
   user: "fedor"
   password: ""
@@ -25,7 +25,7 @@ options:
   music_folder_id: "2"
   music_folder: ""
   sync_interval_minutes: 60
-  conflict_resolution: "server_wins"
+  conflict_resolution: ""
   dry_run: true
   debug: true
 
