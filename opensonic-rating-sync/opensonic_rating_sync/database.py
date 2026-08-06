@@ -33,16 +33,30 @@ def upsert_track_state(song_id: str, file_path: str, mtime_ns: int,
                        s_starred: int, s_rating: int):
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO tracks_state (song_id, file_path, file_mtime_ns, file_starred, file_rating, server_starred, server_rating, last_sync_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(song_id) DO UPDATE SET 
-                file_path=excluded.file_path,
-                file_mtime_ns=excluded.file_mtime_ns,
-                file_starred=excluded.file_starred,
-                file_rating=excluded.file_rating,
-                server_starred=excluded.server_starred,
-                server_rating=excluded.server_rating,
-                last_sync_time=CURRENT_TIMESTAMP
-        """, (song_id, file_path, mtime_ns, f_starred, f_rating, s_starred, s_rating))
+        
+        # Сначала проверяем, есть ли уже запись с таким song_id или file_path
+        cursor.execute("SELECT song_id FROM tracks_state WHERE song_id = ? OR file_path = ?", (song_id, file_path))
+        row = cursor.fetchone()
+        
+        if row:
+            # Если запись есть, обновляем её (это спасает от любых ошибок UNIQUE constraint)
+            cursor.execute("""
+                UPDATE tracks_state SET 
+                    song_id = ?,
+                    file_path = ?, 
+                    file_mtime_ns = ?, 
+                    file_starred = ?, 
+                    file_rating = ?, 
+                    server_starred = ?, 
+                    server_rating = ?, 
+                    last_sync_time = CURRENT_TIMESTAMP
+                WHERE song_id = ? OR file_path = ?
+            """, (song_id, file_path, mtime_ns, f_starred, f_rating, s_starred, s_rating, song_id, file_path))
+        else:
+            # Если записи нет, вставляем новую
+            cursor.execute("""
+                INSERT INTO tracks_state (song_id, file_path, file_mtime_ns, file_starred, file_rating, server_starred, server_rating, last_sync_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (song_id, file_path, mtime_ns, f_starred, f_rating, s_starred, s_rating))
+            
         conn.commit()
