@@ -64,57 +64,59 @@ class SyncAgent:
         logger.info("Цикл синхронизации завершен.")
 
     def _fetch_all_server_songs(self):
-            """
-            Сканирует медиатеку по файловой структуре через get_indexes и get_music_directory 
-            с защитой от NoneType элементов.
-            """
-            songs = []
-            mf_id = self.config.get('music_folder_id') or None
-            
-            try:
-                indexes = self.conn.get_indexes(music_folder_id=mf_id)
-            except Exception as e:
-                logger.error(f"Ошибка получения корневых индексов (папок): {e}")
+        """
+        Получаем треки через физическую файловую структуру (getMusicDirectory),
+        предварительно запросив реальные ID папок через getMusicFolders.
+        """
+        songs = []
+        mf_id = self.config.get('music_folder_id') or None
+        
+        try:
+            # 1. Запрашиваем реальные ID корневых папок у сервера
+            folders = self.conn.get_music_folders()
+            if not folders:
+                logger.error("Сервер не вернул ни одной музыкальной папки (getMusicFolders пустой)!")
                 return songs
-    
-            if not indexes:
-                return songs
-    
-            folders_to_scan = []
-    
-            # 1. Безопасно проверяем алфавитные индексы артистов
-            if hasattr(indexes, 'index') and indexes.index:
-                for idx in indexes.index:
-                    if hasattr(idx, 'artist') and idx.artist:
-                        for artist in idx.artist:
-                            if hasattr(artist, 'id'):
-                                folders_to_scan.append(artist.id)
+                
+            logger.info(f"Сервер вернул доступные папки: {[{'id': f.id, 'name': getattr(f, 'name', 'N/A')} for f in folders]}")
             
-            # 2. Безопасно проверяем прямые дочерние элементы в корне (если они есть и не None)
-            if hasattr(indexes, 'child') and indexes.child:
-                for child in indexes.child:
-                    if child is not None:
-                        if getattr(child, 'is_dir', getattr(child, 'isDir', False)):
-                            folders_to_scan.append(child.id)
-                        else:
-                            songs.append(child)
-    
-            # 3. Рекурсивный обход дерева папок
-            while folders_to_scan:
-                current_folder_id = folders_to_scan.pop(0)
-                try:
-                    directory = self.conn.get_music_directory(current_folder_id)
-                    if directory and hasattr(directory, 'child') and directory.child:
-                        for child in directory.child:
-                            if child is not None:
-                                if getattr(child, 'is_dir', getattr(child, 'isDir', False)):
-                                    folders_to_scan.append(child.id)
-                                else:
-                                    songs.append(child)
-                except Exception as e:
-                    logger.error(f"Ошибка при сканировании директории {current_folder_id}: {e}")
-    
-            return songs
+            # 2. Ищем папку, указанную в настройках аддона (mf_id = "2")
+            target_folder = None
+            if mf_id:
+                target_folder = next((f for f in folders if str(f.id) == str(mf_id)), None)
+                
+            # Если не нашли по ID, ругаемся, но берем первую доступную, чтобы не прерывать работу
+            if not target_folder:
+                logger.warning(f"Папка с ID={mf_id} не найдена на сервере. Используем первую доступную: {folders[0].id}")
+                target_folder = folders[0]
+                
+            logger.info(f"Запрос физической структуры папок для библиотеки '{getattr(target_folder, 'name', '')}' (ID={target_folder.id})...")
+            
+            # 3. Запускаем рекурсивное сканирование с правильным ID
+            self._scan_directory(target_folder.id, songs)
+            
+        except Exception as e:
+            logger.error(f"Ошибка при инициализации сканирования папок: {e}", exc_info=True)
+            
+        return songs
+
+    def _scan_directory(self, dir_id, songs_list):
+        """Рекурсивный обход папок через Subsonic API."""
+        try:
+            dir_data = self.conn.get_music_directory(dir_id)
+            if not dir_data or not hasattr(dir_data, 'child') or not dir_data.child:
+                return
+                
+            for child in dir_data.child:
+                # isDir или is_dir в зависимости от версии API/библиотеки
+                is_dir = getattr(child, 'is_dir', False) or getattr(child, 'isDir', False)
+                if is_dir:
+                    self._scan_directory(child.id, songs_list)
+                else:
+                    songs_list.append(child)
+                    
+        except Exception as e:
+            logger.error(f"Ошибка при сканировании директории {dir_id}: {e}", exc_info=True)
 
     def _process_song(self, song):
         srv_starred = 1 if getattr(song, 'starred', None) else 0
