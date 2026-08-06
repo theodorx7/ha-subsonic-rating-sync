@@ -63,23 +63,45 @@ class SyncAgent:
 
     def run_sync(self):
         logger.info("Начало цикла синхронизации...")
+        
+        # 1. Сначала получаем надежный список ID треков, у которых стоит лайк (starred)
+        starred_ids = self._fetch_starred_ids()
+        logger.info(f"Найдено избранных (starred) треков на сервере: {len(starred_ids)}")
+        
+        # 2. Получаем всю библиотеку для проверки рейтингов и путей
         server_songs = self._fetch_all_server_songs()
         logger.info(f"Найдено треков на сервере: {len(server_songs)}")
         
         for song in server_songs:
             try:
-                self._process_song(song)
+                # Передаем множество starred_ids для точного определения лайка
+                self._process_song(song, starred_ids)
             except Exception as e:
-                # Заменил getattr(song, 'id', 'Unknown') на вызов хэлпера
                 logger.error(f"Ошибка при обработке трека {self._track_label(song)}: {e}", exc_info=True)
 
         logger.info("Цикл синхронизации завершен.")
 
+    def _fetch_starred_ids(self):
+        """
+        Надежный способ получения избранных треков через getStarred2.
+        search3 с пустым запросом часто не возвращает поле starred.
+        """
+        starred_ids = set()
+        try:
+            mf_id = self.config.get('music_folder_id') or None
+            result = self.conn.getStarred2(music_folder_id=mf_id) if mf_id else self.conn.getStarred2()
+            
+            if result and result.song:
+                for s in result.song:
+                    starred_ids.add(s.id)
+        except Exception as e:
+            logger.error(f"Ошибка при получении избранных треков (getStarred2): {e}", exc_info=True)
+            
+        return starred_ids
+
     def _fetch_all_server_songs(self):
         """
         Получаем все треки из библиотеки через search3.
-        Navidrome не поддерживает browse-by-folder, поэтому getIndexes/getMusicDirectory
-        возвращают симулированное дерево по ID3-тегам. Прямой запрос search3 надёжнее.
         """
         songs = []
         mf_id = self.config.get('music_folder_id') or None
@@ -108,7 +130,6 @@ class SyncAgent:
                 songs.extend(result.song)
                 logger.debug(f"Получено треков: {len(result.song)} (всего: {len(songs)})")
                 
-                # Если получили меньше запрошенного — это последняя страница
                 if len(result.song) < count_per_request:
                     break
                     
@@ -119,29 +140,25 @@ class SyncAgent:
             
         return songs
 
-    def _process_song(self, song):
-        srv_starred = 1 if getattr(song, 'starred', None) else 0
-        srv_rating = getattr(song, 'user_rating', 0) or 0
+    def _process_song(self, song, starred_ids):
+        # ИСПРАВЛЕНО 1: Проверяем наличие ID трека в множестве starred_ids
+        srv_starred = 1 if song.id in starred_ids else 0
+        
+        # ИСПРАВЛЕНО 2: camelCase вместо snake_case. Добавлен fallback на всякий случай.
+        srv_rating = getattr(song, 'userRating', getattr(song, 'user_rating', 0)) or 0
     
         if not getattr(song, 'path', None):
             logger.warning(f"Трек {song.id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
             return
     
-        # Navidrome с "Report Full Path" отдаёт АБСОЛЮТНЫЙ путь.
-        # Без этой опции (или для Airsonic) — относительный вида Artist/Album/Track.
         raw_path = unquote(song.path)
         if os.path.isabs(raw_path):
-            # Navidrome с включенной опцией работает здесь идеально
             file_path = os.path.normpath(raw_path)
         else:
-            # Сюда попадут Airsonic/Gonic (отдают реальный, но относительный путь)
-            # И Navidrome с выключенной опцией (отдает путь из тегов)
             base_folder = self.config.get('music_folder', '').strip()
-            
             if not base_folder:
                 logger.warning(f"Трек {self._track_label(song)}: Сервер вернул относительный путь ('{raw_path}'), но опция 'music_folder' не настроена в аддоне. Синхронизация этого файла невозможна. Пропуск.")
                 return
-            
             file_path = os.path.normpath(os.path.join(base_folder, raw_path.lstrip('/')))
     
         if not os.path.exists(file_path):
@@ -181,12 +198,13 @@ class SyncAgent:
         write_server = w_srv_star or w_srv_rate
 
         if self.config.get('dry_run', False):
-            # Используем эмодзи, так как веб-интерфейс HA не поддерживает ANSI-цвета
             wf_str = "🟢 TRUE" if write_file else "⚪ FALSE"
             ws_str = "🟢 TRUE" if write_server else "⚪ FALSE"
             
+            # Добавлен вывод текущих считанных значений для отладки
             logger.info(
                 f"[DRY-RUN] Трек {song.id} — Обновляем файл={wf_str}, Обновляем сервер={ws_str} — "
+                f"Сервер(★:{srv_starred}/Рейтинг:{srv_rating}) | Файл(★:{f_starred}/Рейтинг:{f_rating_os}) — "
                 f"{self._track_label(song, file_path)}"
             )
         else:
@@ -201,13 +219,14 @@ class SyncAgent:
                     
                     if write_server:
                         if t_star == 1 and srv_starred == 0: 
-                            self.conn.star(sids=[song.id])
+                            # ИСПРАВЛЕНО 3: используем ids вместо sids
+                            self.conn.star(ids=[song.id])
                         elif t_star == 0 and srv_starred == 1: 
-                            self.conn.unstar(sids=[song.id])
+                            # ИСПРАВЛЕНО 3: используем ids вместо sids
+                            self.conn.unstar(ids=[song.id])
                         if t_rate_os != srv_rating: 
                             self.conn.set_rating(song.id, t_rate_os)
             except Exception as e:
-                # Заменено на вызов хэлпера
                 logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
                 return
 
