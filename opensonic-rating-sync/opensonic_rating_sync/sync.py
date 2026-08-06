@@ -221,4 +221,64 @@ class SyncAgent:
         write_file = w_file_star or w_file_rate
         write_server = w_srv_star or w_srv_rate
 
-        if self.config
+        if self.config.get('dry_run', False):
+            # ИСПОЛЬЗУЕМ твой метод для красивого вывода
+            file_act = self._get_action_str(write_file, t_star, t_rate_os)
+            srv_act = self._get_action_str(write_server, t_star, t_rate_os)
+            logger.info(f"[DRY-RUN] {self._track_label(song, file_path)} -> Файл: {file_act} | Сервер: {srv_act}")
+        else:
+            lock = get_file_lock(song.id)
+            try:
+                with lock:
+                    if write_file:
+                        # ВАЖНО: Если рейтинга нет (0), передаем None, чтобы ratings.py удалил тег
+                        t_rate_internal = t_rate_os * 2 if t_rate_os > 0 else None
+                        ratings.set_starred_to_file(file_path, t_star)
+                        ratings.set_rating_to_file(file_path, t_rate_internal)
+                        current_mtime = os.stat(file_path).st_mtime_ns
+                        
+                    if write_server:
+                        if t_star == 1 and srv_starred == 0:
+                            self.conn.star(sids=[song.id])
+                        elif t_star == 0 and srv_starred == 1:
+                            self.conn.unstar(sids=[song.id])
+                        if t_rate_os != srv_rating:
+                            self.conn.set_rating(song.id, t_rate_os)
+            except Exception as e:
+                logger.error(f"Ошибка блокировки/записи для {song.id}: {e}", exc_info=True)
+                return False, False # Возврат при ошибке
+
+        final_f_rating = t_rate_os * 2 if t_rate_os > 0 else 0
+        upsert_track_state(
+            song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
+            f_starred=t_star, f_rating=final_f_rating,
+            s_starred=t_star, s_rating=t_rate_os
+        )
+        
+        # ВОЗВРАЩАЕМ флаги успешных записей для счетчика
+        return write_file, write_server
+
+    def _resolve_conflict(self, srv_val, f_val, db_srv_val, db_f_val):
+        srv_val = 0 if srv_val is None else srv_val
+        f_val = 0 if f_val is None else f_val
+        db_srv_val = 0 if db_srv_val is None else db_srv_val
+        db_f_val = 0 if db_f_val is None else db_f_val
+
+        srv_changed = (srv_val != db_srv_val)
+        f_changed = (f_val != db_f_val)
+
+        if not srv_changed and not f_changed:
+            return srv_val, False, False
+        if srv_changed and not f_changed:
+            return srv_val, True, False
+        if not srv_changed and f_changed:
+            return f_val, False, True
+        if srv_changed and f_changed:
+            if srv_val == f_val: 
+                return srv_val, False, False
+            conflict_res = self.config.get('conflict_resolution', 'server_wins')
+            if conflict_res == 'server_wins':
+                return srv_val, True, False
+            elif conflict_res == 'file_wins':
+                return f_val, False, True
+        return srv_val, False, False
