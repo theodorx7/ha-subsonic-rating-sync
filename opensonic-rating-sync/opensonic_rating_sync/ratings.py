@@ -25,7 +25,7 @@ _PLAYER_PROFILES = {
         'like_mp4': '----:com.apple.iTunes:LOVE'
     },
     'plex': {
-        'popm_emails': ['Plex'],
+        'popm_emails': ['no@email', 'Plex'],
         'like_mp3_desc': 'FAVORITE',
         'like_vorbis': 'FAVORITE',
         'like_mp4': '----:com.apple.iTunes:FAVORITE'
@@ -34,10 +34,10 @@ _PLAYER_PROFILES = {
         'popm_emails': ['MediaMonkey', 'no@email'],
         'like_mp3_desc': 'FAVORITE',
         'like_vorbis': 'FAVORITE',
-        'like_mp4': '----:com.apple.iTunes:FAVORITE'
+        'like_mp4': '----:com.apple.iTunes:RATING'
     },
     'navidrome': {
-        'popm_emails': ['no@email', 'Plex'],
+        'popm_emails': ['no@email'],
         'like_mp3_desc': 'FAVORITE',
         'like_vorbis': 'FAVORITE',
         'like_mp4': '----:com.apple.iTunes:FAVORITE'
@@ -46,13 +46,13 @@ _PLAYER_PROFILES = {
         'popm_emails': ['foobar2000', 'no@email'],
         'like_mp3_desc': 'FMPS_Rating_User',
         'like_vorbis': 'FMPS_RATING_USER',
-        'like_mp4': '----:com.apple.iTunes:FMPS_Rating_User'
+        'like_mp4': '----:com.apple.iTunes:RATING'
     },
     'wmp': { # Windows Media Player
         'popm_emails': ['Windows Media Player 9 Series'],
         'like_mp3_desc': 'FAVORITE',
         'like_vorbis': 'FAVORITE',
-        'like_mp4': '----:com.apple.iTunes:FAVORITE'
+        'like_mp4': '----:com.apple.iTunes:RATING'
     }
 }
 
