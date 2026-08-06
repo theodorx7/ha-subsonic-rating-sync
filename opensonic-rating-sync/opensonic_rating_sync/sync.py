@@ -65,61 +65,47 @@ class SyncAgent:
 
     def _fetch_all_server_songs(self):
         """
-        Получаем треки строго через физическую файловую структуру.
-        Согласно документации OpenSubsonic, getIndexes с параметром musicFolderId
-        возвращает физические директории внутри указанной библиотеки.
+        Получаем все треки из библиотеки через search3.
+        Navidrome не поддерживает browse-by-folder, поэтому getIndexes/getMusicDirectory
+        возвращают симулированное дерево по ID3-тегам. Прямой запрос search3 надёжнее.
         """
         songs = []
         mf_id = self.config.get('music_folder_id') or None
         
         if not mf_id:
-            logger.error("Не указан music_folder_id в настройках оддона!")
+            logger.error("Не указан music_folder_id в настройках аддона!")
             return songs
             
         try:
-            logger.info(f"Запрос физических индексов (getIndexes) для библиотеки ID={mf_id}...")
+            logger.info(f"Запрос треков (search3) для библиотеки ID={mf_id}...")
             
-            # Передаем ID вашей библиотеки напрямую в getIndexes
-            indexes = self.conn.get_indexes(music_folder_id=mf_id)
+            offset = 0
+            count_per_request = 500  # Безопасный лимит для одного запроса
             
-            if not indexes or not hasattr(indexes, 'index') or not indexes.index:
-                logger.warning("Сервер не вернул физических папок для указанной библиотеки.")
-                return songs
+            while True:
+                result = self.conn.search3(
+                    query="",
+                    song_count=count_per_request,
+                    song_offset=offset,
+                    music_folder_id=mf_id
+                )
                 
-            # Проходимся по всем буквам/группам индекса
-            for idx in indexes.index:
-                if hasattr(idx, 'artist') and idx.artist:
-                    for artist_folder in idx.artist:
-                        # artist_folder.id здесь — это реальный ID папки на диске
-                        # Запускаем рекурсивный обход
-                        self._scan_directory(artist_folder.id, songs)
-                        
+                if not result or not result.song:
+                    break
+                    
+                songs.extend(result.song)
+                logger.debug(f"Получено треков: {len(result.song)} (всего: {len(songs)})")
+                
+                # Если получили меньше запрошенного — это последняя страница
+                if len(result.song) < count_per_request:
+                    break
+                    
+                offset += count_per_request
+                
         except Exception as e:
-            logger.error(f"Ошибка при инициализации сканирования (getIndexes): {e}", exc_info=True)
+            logger.error(f"Ошибка при получении треков (search3): {e}", exc_info=True)
             
         return songs
-
-    def _scan_directory(self, dir_id, songs_list):
-        """
-        Рекурсивный обход папок через getMusicDirectory.
-        Возвращает реальные пути к файлам на диске.
-        """
-        try:
-            dir_data = self.conn.get_music_directory(dir_id)
-            if not dir_data or not hasattr(dir_data, 'child') or not dir_data.child:
-                return
-                
-            for child in dir_data.child:
-                # Проверяем, является ли объект папкой
-                is_dir = getattr(child, 'is_dir', False) or getattr(child, 'isDir', False)
-                if is_dir:
-                    self._scan_directory(child.id, songs_list)
-                else:
-                    # Для файлов атрибут path будет содержать физический путь
-                    songs_list.append(child)
-                    
-        except Exception as e:
-            logger.error(f"Ошибка при сканировании директории {dir_id}: {e}", exc_info=True)
 
     def _process_song(self, song):
         srv_starred = 1 if getattr(song, 'starred', None) else 0
