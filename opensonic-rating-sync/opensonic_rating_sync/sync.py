@@ -119,9 +119,17 @@ class SyncAgent:
         # Без этой опции (или для Airsonic) — относительный вида Artist/Album/Track.
         raw_path = unquote(song.path)
         if os.path.isabs(raw_path):
+            # Navidrome с включенной опцией работает здесь идеально
             file_path = os.path.normpath(raw_path)
         else:
-            base_folder = self.config['music_folder'].rstrip('/')
+            # Сюда попадут Airsonic/Gonic (отдают реальный, но относительный путь)
+            # И Navidrome с выключенной опцией (отдает путь из тегов)
+            base_folder = self.config.get('music_folder', '').strip()
+            
+            if not base_folder:
+                logger.warning(f"Трек {song.id}: Сервер вернул относительный путь ('{raw_path}'), но опция 'music_folder' не настроена в аддоне. Синхронизация этого файла невозможна. Пропуск.")
+                return
+            
             file_path = os.path.normpath(os.path.join(base_folder, raw_path.lstrip('/')))
     
         if not os.path.exists(file_path):
