@@ -27,7 +27,7 @@ options:
     - "musicbee"
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
-  sync_interval_minutes: ""
+  sync_interval_minutes: "60"
   dry_run: true
   debug: true
 schema:
