@@ -14,18 +14,14 @@ _ALTERNATIVE_MP3_RATING_MAP = {0: 0, 2: 1, 4: 64, 6: 128, 8: 196, 10: 255}
 _PICARD_MP3_RATING_MAP = {0: 0, 2: 51, 4: 102, 6: 153, 8: 204, 10: 255}
 _KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email", "Navidrome"]
 _RATING_EMAIL = "Navidrome" 
+# --- Теги лайка в формате MusicBee (бинарный like: "L"=love, отсутствие тега=нет лайка) ---
+_LIKE_TAG_ID3  = "LOVE RATING"                            # TXXX:LOVE RATING (MP3/AIFF)
+_LIKE_TAG_XIPH = "LOVE RATING"                            # Vorbis Comment (FLAC/OGG/OPUS)
+_LIKE_TAG_MP4  = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
+_LIKE_VALUE_ON = "L"                                      # MusicBee пишет "L" для Love
 
-# Заглушка для будущей реализации мультиплеерности (Развилка 5)
+# Заглушка для будущей реализации мультиплеерности 
 #_active_players = []
-
-# --- ПРОФИЛИ ПЛЕЕРОВ ---
-#_PLAYER_PROFILES = {
-#    'musicbee': {
-#        'popm_emails': ['musicbee@no.email', 'no@email'],
-#        'like_mp3_desc': 'LOVE RATING',                 # ИСПРАВЛЕНО: С пробелом
-#        'like_vorbis': 'LOVE RATING',                   # ИСПРАВЛЕНО: С пробелом
-#        'like_mp4': '----:com.apple.iTunes:LOVERATING'  # ИСПРАВЛЕНО: Без пробела
-#    }
 
 def set_active_players(players_list):
     global _active_players
@@ -104,6 +100,25 @@ class ID3Handler(RatingHandler):
             audio.tags.add(TXXX(encoding=3, desc="FAVORITE", text="1" if starred else "0"))
             audio.save()
         except Exception as e: logger.error(f"ID3 write star err ({file_path}): {e}")
+
+    def read_liked(self, file_path: str) -> int:
+        try:
+            audio = self._load(file_path)
+            if audio and audio.tags:
+                like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG_ID3}")
+                if like_frames: return 1 if str(like_frames[0].text[0]) == _LIKE_VALUE_ON else 0
+        except Exception: pass
+        return 0
+    def write_liked(self, file_path: str, liked: bool) -> None:
+        try:
+            audio = self._load(file_path)
+            if audio is None: return
+            if audio.tags is None: audio.tags = ID3()
+            audio.tags.delall(f"TXXX:{_LIKE_TAG_ID3}")
+            if liked:
+                audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG_ID3, text=_LIKE_VALUE_ON))
+            audio.save()
+        except Exception as e: logger.error(f"ID3 write like err ({file_path}): {e}")
 
 class MP3Handler(ID3Handler):
     def _load(self, file_path): return MP3(file_path, ID3=ID3)
