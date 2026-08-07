@@ -24,29 +24,22 @@ class SyncAgent:
         host = host.split('/')[0].split(':')[0]
         base_url = f"{config['server_protocol']}://{host}"
         
-        api_key = config.get('api_key') or None
-        username = config.get('user') or None
-        password = config.get('password') or None
-        
+        # Используем только Username/Password (библиотека libopensonic 
+        # сама преобразует их в безопасный token + salt для Subsonic API)
         conn_kwargs = {
             'base_url': base_url,
             'port': config['server_port'],
-            'app_name': "Rating Sync Agent"
+            'app_name': "Rating Sync Agent",
+            'username': config.get('user') or None,
+            'password': config.get('password') or None
         }
-        if api_key:
-            conn_kwargs['api_key'] = api_key
-            auth_method = "API Key"
-        else:
-            conn_kwargs['username'] = username
-            conn_kwargs['password'] = password
-            auth_method = "Username/Password"
             
         self.conn = libopensonic.Connection(**conn_kwargs)
         try:
             ok = self.conn.ping()
             if not ok:
                 raise ConnectionError("ping() вернул False")
-            logger.info(f"Подключение к Navidrome установлено: {base_url}:{config['server_port']} ({auth_method}, ping OK)")
+            logger.info(f"Подключение к Navidrome установлено: {base_url}:{config['server_port']} (Username/Password, ping OK)")
         except Exception as e:
             logger.error(f"Ошибка подключения к Navidrome ({base_url}:{config['server_port']}): {e}")
             raise
