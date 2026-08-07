@@ -26,7 +26,6 @@ def load_config() -> dict:
         "server_port":          int(raw.get("server_port") or 443),
         "user":                 raw.get("user", ""),
         "password":             raw.get("password", ""),
-        "api_key":              raw.get("api_key", ""),
         "music_folder":         raw.get("music_folder", ""),
         "music_folder_id":      raw.get("music_folder_id", ""),
         "players":              raw.get("players", ["musicbee"]),  # <--- ДОБАВЛЕНО ЗДЕСЬ
