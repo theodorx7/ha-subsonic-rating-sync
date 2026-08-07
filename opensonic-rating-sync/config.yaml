@@ -25,7 +25,7 @@ options:
   music_folder: ""
   players:
     - "musicbee"
-  sync_interval_minutes: 60
+  sync_interval_minutes: ""
   conflict_resolution: "server_wins"
   dry_run: true
   debug: true
