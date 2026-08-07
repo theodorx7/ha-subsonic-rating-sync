@@ -239,7 +239,7 @@ class SyncAgent:
         
         logger.info(
             f"{prefix}ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
-            f"{self._track_label(song, file_path)}"
+            f"({self._track_label(song, file_path)})"
         )
         
         if self.config.get('dry_run', False):
