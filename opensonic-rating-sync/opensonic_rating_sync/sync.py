@@ -227,7 +227,7 @@ class SyncAgent:
                 if abs(f_rating_5_scale - srv_rating) > 0.5:
                     prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
                     logger.info(
-                        f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_internal}. "
+                        f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. "
                         f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
                         f"({self._track_label(song, file_path)})"
                     )
