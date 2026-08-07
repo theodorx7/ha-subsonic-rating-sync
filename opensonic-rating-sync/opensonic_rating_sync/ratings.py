@@ -73,12 +73,15 @@ class ID3Handler(RatingHandler):
             audio = self._load(file_path)
             if audio is None: return
             if audio.tags is None: audio.tags = ID3()
+            
+            # Ищем и удаляем все наши фреймы POPM с email Navidrome
             popm_frames = audio.tags.getall("POPM")
-            nav_popm = next((f for f in popm_frames if f.email == _RATING_EMAIL), None)
-            popm_rating = _internal_rating_to_popm(rating)
-            if nav_popm:
-                nav_popm.rating = popm_rating; nav_popm.count = 0
-            else:
+            for f in [f for f in popm_frames if f.email == _RATING_EMAIL]:
+                audio.tags.remove(f)
+                
+            # Добавляем фрейм только если рейтинг валиден (не None и > 0)
+            if rating is not None and rating > 0:
+                popm_rating = _internal_rating_to_popm(rating)
                 audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
             audio.save()
         except Exception as e: logger.error(f"ID3 write rating err ({file_path}): {e}")
@@ -126,9 +129,14 @@ class XiphHandler(RatingHandler):
         try:
             audio = MutagenFile(file_path)
             if audio:
-                # Если rating is None, пишем 0
-                xiph_rating = "0" if rating is None or rating == 0 else str(max(10, min(100, rating * 10)))
-                audio["RATING"] = xiph_rating
+                # Удаляем тег RATING, если он есть
+                if "RATING" in audio:
+                    del audio["RATING"]
+                    
+                # Пишем новый тег только если рейтинг валиден
+                if rating is not None and rating > 0:
+                    xiph_rating = str(max(10, min(100, rating * 10)))
+                    audio["RATING"] = xiph_rating
                 audio.save()
         except Exception as e: logger.error(f"Xiph write rating err ({file_path}): {e}")
 
@@ -167,8 +175,15 @@ class MP4Handler(RatingHandler):
         try:
             audio = MP4(file_path)
             if audio.tags is None: audio.add_tags()
-            m4a_rating = "0" if rating is None or rating == 0 else str(max(10, min(100, rating * 10)))
-            audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
+            
+            # Удаляем тег RATE, если он есть
+            if self._RATE_TAG in audio.tags:
+                del audio.tags[self._RATE_TAG]
+                
+            # Пишем новый тег только если рейтинг валиден
+            if rating is not None and rating > 0:
+                m4a_rating = str(max(10, min(100, rating * 10)))
+                audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
             audio.save()
         except Exception as e: logger.error(f"MP4 write rating err ({file_path}): {e}")
 
