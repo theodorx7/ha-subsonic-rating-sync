@@ -16,16 +16,16 @@ _KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email", "Navidrome"]
 _RATING_EMAIL = "Navidrome" 
 
 # Заглушка для будущей реализации мультиплеерности (Развилка 5)
-_active_players = []
+#_active_players = []
 
 # --- ПРОФИЛИ ПЛЕЕРОВ ---
-_PLAYER_PROFILES = {
-    'musicbee': {
-        'popm_emails': ['musicbee@no.email', 'no@email'],
-        'like_mp3_desc': 'LOVE RATING',                 # ИСПРАВЛЕНО: С пробелом
-        'like_vorbis': 'LOVE RATING',                   # ИСПРАВЛЕНО: С пробелом
-        'like_mp4': '----:com.apple.iTunes:LOVERATING'  # ИСПРАВЛЕНО: Без пробела
-    }
+#_PLAYER_PROFILES = {
+#    'musicbee': {
+#        'popm_emails': ['musicbee@no.email', 'no@email'],
+#        'like_mp3_desc': 'LOVE RATING',                 # ИСПРАВЛЕНО: С пробелом
+#        'like_vorbis': 'LOVE RATING',                   # ИСПРАВЛЕНО: С пробелом
+#        'like_mp4': '----:com.apple.iTunes:LOVERATING'  # ИСПРАВЛЕНО: Без пробела
+#    }
 
 def set_active_players(players_list):
     global _active_players
