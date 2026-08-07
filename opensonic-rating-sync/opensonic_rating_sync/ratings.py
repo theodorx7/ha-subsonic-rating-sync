@@ -58,6 +58,7 @@ class ID3Handler(RatingHandler):
             if audio and audio.tags:
                 popm_frames = audio.tags.getall("POPM")
                 if popm_frames:
+                    # При чтении приоритет отдаем своему тегу, потом любому другому
                     nav_popm = next((f for f in popm_frames if f.email == _RATING_EMAIL), None)
                     if nav_popm: return _popm_rating_to_internal(nav_popm.rating, _RATING_EMAIL)
                     return _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
@@ -69,16 +70,30 @@ class ID3Handler(RatingHandler):
             audio = self._load(file_path)
             if audio is None: return
             if audio.tags is None: audio.tags = ID3()
-            
-            # Ищем и удаляем все наши фреймы POPM с email Navidrome
+
+            # Получаем ВСЕ существующие фреймы рейтингов (от любых программ)
             popm_frames = audio.tags.getall("POPM")
-            for f in [f for f in popm_frames if f.email == _RATING_EMAIL]:
-                audio.tags.remove(f)
-                
-            # Добавляем фрейм только если рейтинг валиден (не None и > 0)
-            if rating is not None and rating > 0:
+
+            if rating is None or rating == 0:
+                # --- СЛУЧАЙ 1: Рейтинг 0 ---
+                # Если есть хоть какие-то рейтинги — удаляем ВСЕ найденные POPM фреймы.
+                # Метод delall("POPM") вычистит все фреймы рейтинга без разбора email.
+                if popm_frames:
+                    audio.tags.delall("POPM")
+            else:
+                # --- СЛУЧАЙ 2: Рейтинг > 0 ---
                 popm_rating = _internal_rating_to_popm(rating)
-                audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
+                
+                if popm_frames:
+                    # Нашли чужие теги? НЕ создаем свой!
+                    # Проходим по всем найденным фреймам и перезаписываем их значения.
+                    for frame in popm_frames:
+                        frame.rating = popm_rating
+                        frame.count = 0 # Обнуляем счетчик воспроизведения для чистоты
+                else:
+                    # Нет никаких тегов? Создаем свой (Navidrome)
+                    audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
+            
             audio.save()
         except Exception as e: logger.error(f"ID3 write rating err ({file_path}): {e}")
 
