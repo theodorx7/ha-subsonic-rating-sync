@@ -25,8 +25,9 @@ options:
   music_folder: ""
   players:
     - "musicbee"
-  sync_interval_minutes: ""
+  sync_mode: "two-way"
   conflict_resolution: "server_wins"
+  sync_interval_minutes: ""
   dry_run: true
   debug: true
 schema:
@@ -39,8 +40,9 @@ schema:
   music_folder: str?
   players:
     - list(musicbee|plex|mediamonkey|navidrome|foobar2000|wmp)
-  sync_interval_minutes: int?
+  sync_mode: list(two-way|file-to-server|server-to-file)
   conflict_resolution: list(server_wins|file_wins)
+  sync_interval_minutes: int?
   dry_run: bool
   debug: bool
   
