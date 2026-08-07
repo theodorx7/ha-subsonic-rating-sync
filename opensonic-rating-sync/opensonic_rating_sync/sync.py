@@ -153,8 +153,11 @@ class SyncAgent:
             f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
             f_rating_internal = db_state['file_rating']
 
+        # --- ВАЖНОЕ ИСПРАВЛЕНИЕ: Нормализуем None в 0 для корректного сравнения ---
+        f_rating_internal = f_rating_internal if f_rating_internal is not None else 0
+
         # --- НОВАЯ ЛОГИКА ДОПУСКА (TOLERANCE) 0.5 ---
-        f_rating_5_scale = (f_rating_internal or 0) / 2.0
+        f_rating_5_scale = f_rating_internal / 2.0
         
         # Если разница <= 0.5 звезды, считаем, что данные синхронизированы
         if abs(f_rating_5_scale - srv_rating) <= 0.5:
@@ -171,6 +174,8 @@ class SyncAgent:
             srv_changed = (srv_rating != db_srv_rating)
             f_changed = (f_rating_internal != db_f_rating)
             
+            is_new_file = (db_state['file_mtime_ns'] == 0)
+            
             # 1. Изменился только сервер -> победа сервера
             if srv_changed and not f_changed:
                 t_rate_os = srv_rating
@@ -185,8 +190,6 @@ class SyncAgent:
                 
             # 3. Изменились ОБА (или первый запуск с чистой БД)
             else:
-                # Проверяем, физически ли менялся файл на диске с прошлого раза
-                is_new_file = (db_state['file_mtime_ns'] == 0)
                 file_mtime_changed = (not is_new_file) and (current_mtime != db_state['file_mtime_ns'])
                 
                 # Если файл точно меняли руками (обновилось mtime) -> он побеждает
@@ -195,16 +198,15 @@ class SyncAgent:
                     t_rate_internal = f_rating_internal if f_rating_internal else 0
                     w_file_rate, w_srv_rate = False, True
                     
-                # ПЕРВЫЙ ЗАПУСК: данные есть и там, и там, но разные.
-                # НЕ затираем ничего. Просто запоминаем текущее состояние, 
-                # чтобы дождаться явного решения от пользователя.
-                elif is_new_file:
+                # ПЕРВЫЙ ЗАПУСК в режиме two-way: данные есть и там, и там, но разные.
+                # НЕ затираем ничего. Замораживаем.
+                elif is_new_file and self.sync_mode == 'two-way':
                     t_rate_os = srv_rating
                     t_rate_internal = f_rating_internal if f_rating_internal else 0
                     w_file_rate, w_srv_rate = False, False
                     
                 else:
-                    # Если оба изменились в процессе работы, но mtime файла не свежее 
+                    # В остальных случаях (односторонние режимы или рабочие конфликты) 
                     # -> применяем глобальную настройку разрешения конфликтов
                     conflict_res = self.config.get('conflict_resolution', 'server_wins')
                     if conflict_res == 'server_wins':
@@ -224,10 +226,7 @@ class SyncAgent:
         write_file = (w_file_star or w_file_rate) and self.sync_mode in ['two-way', 'server-to-file']
         write_server = (w_srv_star or w_srv_rate) and self.sync_mode in ['two-way', 'file-to-server']
 
-        # --- НОВОЕ: Принудительное сохранение в БД при первом запуске ---
-        # Если это первый запуск (БД была пуста), и мы решили ничего не менять (чтобы не затереть данные),
-        # нам все равно нужно сохранить текущее состояние в БД, чтобы трек больше не считался новым.
-        is_new_file = (db_state['file_mtime_ns'] == 0)
+        # --- Принудительное сохранение в БД при первом запуске (двусторонний режим) ---
         if is_new_file and not write_file and not write_server and self.sync_mode == 'two-way':
             if not self.config.get('dry_run', False):
                 final_f_rating = t_rate_internal
@@ -236,12 +235,14 @@ class SyncAgent:
                     f_starred=t_star, f_rating=final_f_rating,
                     s_starred=t_star, s_rating=t_rate_os
                 )
-                # Меняем уровень на INFO, чтобы пользователь точно заметил
-                logger.info(
-                    f"ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_internal}. "
-                    f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
-                    f"({self._track_label(song, file_path)})"
-                )
+            
+            # Выводим лог даже в dry_run, чтобы пользователь видел замороженные конфликты
+            prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
+            logger.info(
+                f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_internal}. "
+                f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
+                f"({self._track_label(song, file_path)})"
+            )
             return False, False
 
         if not write_file and not write_server:
