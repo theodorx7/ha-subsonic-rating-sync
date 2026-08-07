@@ -1,5 +1,6 @@
 import os
 import logging
+import math
 from urllib.parse import unquote
 from .locker import get_file_lock
 from .database import get_track_state, upsert_track_state
@@ -158,9 +159,8 @@ class SyncAgent:
             t_rate_internal = f_rating_internal if f_rating_internal else (srv_rating * 2 if srv_rating > 0 else 0)
             w_file_rate, w_srv_rate = False, False
         else:
-            # Разница > 0.5 - это жесткий конфликт. Конвертируем для сравнения по старой логике
-            f_rating_os = round(f_rating_internal / 2) if f_rating_internal else 0
-            db_f_rating_os = round(db_state['file_rating'] / 2) if db_state['file_rating'] else 0
+            f_rating_os = math.ceil(f_rating_internal / 2) if f_rating_internal else 0
+            db_f_rating_os = math.ceil(db_state['file_rating'] / 2) if db_state['file_rating'] else 0
             
             t_rate_os, w_file_rate, w_srv_rate = self._resolve_conflict(
                 srv_rating, f_rating_os, db_state['server_rating'], db_f_rating_os
