@@ -170,6 +170,24 @@ class XiphHandler(RatingHandler):
                 audio.save()
         except Exception as e: logger.error(f"Xiph write star err ({file_path}): {e}")
 
+    def read_liked(self, file_path: str) -> int:
+        try:
+            audio = MutagenFile(file_path)
+            if audio and _LIKE_TAG_XIPH in audio:
+                return 1 if str(audio[_LIKE_TAG_XIPH][0]) == _LIKE_VALUE_ON else 0
+        except Exception: pass
+        return 0
+    def write_liked(self, file_path: str, liked: bool) -> None:
+        try:
+            audio = MutagenFile(file_path)
+            if audio:
+                if liked:
+                    audio[_LIKE_TAG_XIPH] = _LIKE_VALUE_ON
+                elif _LIKE_TAG_XIPH in audio:
+                    del audio[_LIKE_TAG_XIPH]
+                audio.save()
+        except Exception as e: logger.error(f"Xiph write like err ({file_path}): {e}")
+
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
 class MP4Handler(RatingHandler):
     _RATE_TAG = "----:com.apple.iTunes:RATE"
@@ -218,6 +236,24 @@ class MP4Handler(RatingHandler):
             audio.save()
         except Exception as e: logger.error(f"MP4 write star err ({file_path}): {e}")
 
+    def read_liked(self, file_path: str) -> int:
+        try:
+            audio = MP4(file_path)
+            if audio.tags and _LIKE_TAG_MP4 in audio.tags:
+                return 1 if audio.tags[_LIKE_TAG_MP4][0].decode('utf-8') == _LIKE_VALUE_ON else 0
+        except Exception: pass
+        return 0
+    def write_liked(self, file_path: str, liked: bool) -> None:
+        try:
+            audio = MP4(file_path)
+            if audio.tags is None: audio.add_tags()
+            if liked:
+                audio[_LIKE_TAG_MP4] = [bytes(_LIKE_VALUE_ON, 'utf-8')]
+            elif _LIKE_TAG_MP4 in audio.tags:
+                del audio[_LIKE_TAG_MP4]
+            audio.save()
+        except Exception as e: logger.error(f"MP4 write like err ({file_path}): {e}")
+
 # --- РЕЕСТР И ФАСАД ---
 HANDLER_REGISTRY = {
     ".mp3": MP3Handler(), ".aif": AIFFHandler(), ".aiff": AIFFHandler(),
@@ -244,4 +280,10 @@ def get_starred_from_file(file_path: str) -> int:
 def set_starred_to_file(file_path: str, starred: bool) -> None:
     handler = get_handler(file_path)
     if handler: handler.write_starred(file_path, starred)
-        
+
+def get_liked_from_file(file_path: str) -> int:
+    handler = get_handler(file_path)
+    return handler.read_liked(file_path) if handler else 0
+def set_liked_to_file(file_path: str, liked: bool) -> None:
+    handler = get_handler(file_path)
+    if handler: handler.write_liked(file_path, liked)
