@@ -22,15 +22,16 @@ def load_config() -> dict:
 
     return {
         "server_protocol":      raw.get("server_protocol", ""),
-        "server_host": str(raw.get("server_host") or "").strip(),
+        "server_host":          str(raw.get("server_host") or "").strip(),
         "server_port":          int(raw.get("server_port") or 443),
         "user":                 raw.get("user", ""),
         "password":             raw.get("password", ""),
         "music_folder":         raw.get("music_folder", ""),
         "music_folder_id":      raw.get("music_folder_id", ""),
         "players":              raw.get("players", ["musicbee"]),  # <--- ДОБАВЛЕНО ЗДЕСЬ
-        "sync_interval_minutes": int(raw.get("sync_interval_minutes") or 60),
+        "sync_mode":            raw.get("sync_mode", ""),
         "conflict_resolution":  raw.get("conflict_resolution", ""),
+        "sync_interval_minutes": int(raw.get("sync_interval_minutes") or 60),
         "dry_run":              bool(raw.get("dry_run", False)),
         "debug":                bool(raw.get("debug", False)),
     }
