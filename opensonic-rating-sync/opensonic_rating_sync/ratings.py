@@ -1,20 +1,22 @@
 import logging
-from urllib.parse import unquote
+import os
 from mutagen import File as MutagenFile
 from mutagen.aiff import AIFF
 from mutagen.id3 import ID3, POPM, TXXX
 from mutagen.mp3 import MP3
-from mutagen.mp4 import MP4, MP4Tags
+from mutagen.mp4 import MP4
 
 logger = logging.getLogger(__name__)
 
-# --- КАРТА МАСШТАБОВ РЕЙТИНГА (1-10) ---
+# --- КОНСТАНТЫ И КАРТЫ POPM ---
 _PRIMARY_MP3_RATING_MAP = {0: 0, 1: 13, 2: 1, 3: 54, 4: 64, 5: 118, 6: 128, 7: 186, 8: 196, 9: 242, 10: 255}
 _ALTERNATIVE_MP3_RATING_MAP = {0: 0, 2: 1, 4: 64, 6: 128, 8: 196, 10: 255}
 _PICARD_MP3_RATING_MAP = {0: 0, 2: 51, 4: 102, 6: 153, 8: 204, 10: 255}
+_KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email", "Navidrome"]
+_RATING_EMAIL = "Navidrome" 
 
-_AIFF_FORMATS = {".aif": "AIFF", ".aiff": "AIFF"}
-_XIPH_FORMATS = {".flac": "FLAC", ".ogg": "OGG", ".opus": "OPUS"}
+# Заглушка для будущей реализации мультиплеерности (Развилка 5)
+_active_players = []
 
 # --- ПРОФИЛИ ПЛЕЕРОВ ---
 _PLAYER_PROFILES = {
@@ -23,51 +25,26 @@ _PLAYER_PROFILES = {
         'like_mp3_desc': 'LOVE RATING',                 # ИСПРАВЛЕНО: С пробелом
         'like_vorbis': 'LOVE RATING',                   # ИСПРАВЛЕНО: С пробелом
         'like_mp4': '----:com.apple.iTunes:LOVERATING'  # ИСПРАВЛЕНО: Без пробела
-    },
-    'plex': {
-        'popm_emails': ['no@email', 'Plex'],
-        'like_mp3_desc': 'FAVORITE',
-        'like_vorbis': 'FAVORITE',
-        'like_mp4': '----:com.apple.iTunes:FAVORITE'
-    },
-    'mediamonkey': {
-        'popm_emails': ['MediaMonkey', 'no@email'],
-        'like_mp3_desc': 'FAVORITE',
-        'like_vorbis': 'FAVORITE',
-        'like_mp4': '----:com.apple.iTunes:RATING'
-    },
-    'navidrome': {
-        'popm_emails': ['no@email'],
-        'like_mp3_desc': 'FAVORITE',
-        'like_vorbis': 'FAVORITE',
-        'like_mp4': '----:com.apple.iTunes:FAVORITE'
-    },
-    'foobar2000': {
-        'popm_emails': ['foobar2000', 'no@email'],
-        'like_mp3_desc': 'FMPS_Rating_User',
-        'like_vorbis': 'FMPS_RATING_USER',
-        'like_mp4': '----:com.apple.iTunes:RATING'
-    },
-    'wmp': { # Windows Media Player
-        'popm_emails': ['Windows Media Player 9 Series'],
-        'like_mp3_desc': 'FAVORITE',
-        'like_vorbis': 'FAVORITE',
-        'like_mp4': '----:com.apple.iTunes:RATING'
     }
-}
-
-_ACTIVE_PLAYERS = ['musicbee']
 
 def set_active_players(players_list):
-    global _ACTIVE_PLAYERS
-    _ACTIVE_PLAYERS = players_list
-    logger.info(f"Активные профили плееров для синхронизации: {_ACTIVE_PLAYERS}")
+    global _active_players
+    _active_players = players_list or []
+    logger.debug(f"Активные плееры установлены: {_active_players}")
 
-# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ РЕЙТИНГА ---
+# --- БАЗОВЫЙ КЛАСС СТРАТЕГИИ ---
+class RatingHandler:
+    def read_rating(self, file_path: str) -> int | None: raise NotImplementedError
+    def write_rating(self, file_path: str, rating: int) -> None: raise NotImplementedError
+    def read_starred(self, file_path: str) -> int: raise NotImplementedError
+    def write_starred(self, file_path: str, starred: bool) -> None: raise NotImplementedError
+
+# --- КОНВЕРСИИ POPM ---
 def _popm_rating_to_internal(popm_rating, email=None):
     if popm_rating == 0 or popm_rating is None: return None
-    for internal_rating, popm_value in _PRIMARY_MP3_RATING_MAP.items():
-        if popm_rating == popm_value: return internal_rating
+    if email in _KNOWN_PRIMARY_RATING_PLAYERS:
+        for internal_rating, popm_value in _PRIMARY_MP3_RATING_MAP.items():
+            if popm_rating == popm_value: return internal_rating
     for map_to_try in [_ALTERNATIVE_MP3_RATING_MAP, _PICARD_MP3_RATING_MAP]:
         for internal_rating, popm_value in map_to_try.items():
             if popm_rating == popm_value: return internal_rating
@@ -77,205 +54,164 @@ def _internal_rating_to_popm(internal_rating):
     if internal_rating == 0 or internal_rating is None: return 0
     return _PRIMARY_MP3_RATING_MAP.get(internal_rating, 0)
 
-# --- MP3 / AIFF ---
-def _get_rating_from_id3(audio):
-    if not audio.tags: return None
-    popm_frames = audio.tags.getall("POPM")
-    if not popm_frames: return None
-    
-    for player in _ACTIVE_PLAYERS:
-        for email in _PLAYER_PROFILES[player]['popm_emails']:
-            frame = next((f for f in popm_frames if f.email == email), None)
-            if frame and frame.rating > 0:
-                return _popm_rating_to_internal(frame.rating, email)
-    return None
+# --- СТРАТЕГИИ ID3 (MP3 / AIFF) ---
+class ID3Handler(RatingHandler):
+    def read_rating(self, file_path: str) -> int | None:
+        try:
+            audio = self._load(file_path)
+            if audio and audio.tags:
+                popm_frames = audio.tags.getall("POPM")
+                if popm_frames:
+                    nav_popm = next((f for f in popm_frames if f.email == _RATING_EMAIL), None)
+                    if nav_popm: return _popm_rating_to_internal(nav_popm.rating, _RATING_EMAIL)
+                    return _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
+        except Exception as e: logger.error(f"ID3 read rating err ({file_path}): {e}")
+        return None
 
-def _set_rating_to_id3(audio, internal_rating):
-    if audio.tags is None: audio.tags = ID3()
-    
-    for player in _ACTIVE_PLAYERS:
-        for email in _PLAYER_PROFILES[player]['popm_emails']:
-            existing = [f for f in audio.tags.getall("POPM") if f.email == email]
-            for f in existing:
-                audio.tags.remove(f)
-            
-            if internal_rating is not None and internal_rating > 0:
-                popm_val = _internal_rating_to_popm(internal_rating)
-                audio.tags.add(POPM(email=email, rating=popm_val, count=0))
+    def write_rating(self, file_path: str, rating: int) -> None:
+        try:
+            audio = self._load(file_path)
+            if audio is None: return
+            if audio.tags is None: audio.tags = ID3()
+            popm_frames = audio.tags.getall("POPM")
+            nav_popm = next((f for f in popm_frames if f.email == _RATING_EMAIL), None)
+            popm_rating = _internal_rating_to_popm(rating)
+            if nav_popm:
+                nav_popm.rating = popm_rating; nav_popm.count = 0
+            else:
+                audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
+            audio.save()
+        except Exception as e: logger.error(f"ID3 write rating err ({file_path}): {e}")
 
-def _get_starred_from_id3(audio):
-    if not audio.tags: return 0
-    for player in _ACTIVE_PLAYERS:
-        desc = _PLAYER_PROFILES[player]['like_mp3_desc']
-        fav_frames = audio.tags.getall(f"TXXX:{desc}")
-        # ИСПРАВЛЕНО: Добавлено распознавание "L" для MusicBee
-        if fav_frames and str(fav_frames[0].text[0]) in ("1", "1.0", "L"):
-            return 1
-    return 0
+    def read_starred(self, file_path: str) -> int:
+        try:
+            audio = self._load(file_path)
+            if audio and audio.tags:
+                fav_frames = audio.tags.getall("TXXX:FAVORITE")
+                if fav_frames: return 1 if str(fav_frames[0].text[0]) == "1" else 0
+        except Exception: pass
+        return 0
 
-def _set_starred_to_id3(audio, starred):
-    if audio.tags is None: audio.tags = ID3()
-    
-    for player in _ACTIVE_PLAYERS:
-        desc = _PLAYER_PROFILES[player]['like_mp3_desc']
-        audio.tags.delall(f"TXXX:{desc}")
+    def write_starred(self, file_path: str, starred: bool) -> None:
+        try:
+            audio = self._load(file_path)
+            if audio is None: return
+            if audio.tags is None: audio.tags = ID3()
+            audio.tags.delall("TXXX:FAVORITE")
+            audio.tags.add(TXXX(encoding=3, desc="FAVORITE", text="1" if starred else "0"))
+            audio.save()
+        except Exception as e: logger.error(f"ID3 write star err ({file_path}): {e}")
+
+class MP3Handler(ID3Handler):
+    def _load(self, file_path): return MP3(file_path, ID3=ID3)
+
+class AIFFHandler(ID3Handler):
+    def _load(self, file_path): return AIFF(file_path)
+
+# --- СТРАТЕГИЯ XIPH (FLAC, OGG, OPUS) ---
+class XiphHandler(RatingHandler):
+    def read_rating(self, file_path: str) -> int | None:
+        try:
+            audio = MutagenFile(file_path)
+            if audio:
+                rating_raw = audio.get("RATING")
+                if rating_raw:
+                    xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+                    if xiph_rating == 0: return None
+                    return max(1, min(10, round(xiph_rating / 10)))
+        except Exception as e: logger.error(f"Xiph read rating err ({file_path}): {e}")
+        return None
+
+    def write_rating(self, file_path: str, rating: int) -> None:
+        try:
+            audio = MutagenFile(file_path)
+            if audio:
+                # Если rating is None, пишем 0
+                xiph_rating = "0" if rating is None or rating == 0 else str(max(10, min(100, rating * 10)))
+                audio["RATING"] = xiph_rating
+                audio.save()
+        except Exception as e: logger.error(f"Xiph write rating err ({file_path}): {e}")
+
+    def read_starred(self, file_path: str) -> int:
+        try:
+            audio = MutagenFile(file_path)
+            if audio and "FAVORITE" in audio: return 1 if str(audio["FAVORITE"][0]) == "1" else 0
+        except Exception: pass
+        return 0
+
+    def write_starred(self, file_path: str, starred: bool) -> None:
+        try:
+            audio = MutagenFile(file_path)
+            if audio:
+                audio["FAVORITE"] = "1" if starred else "0"
+                audio.save()
+        except Exception as e: logger.error(f"Xiph write star err ({file_path}): {e}")
+
+# --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
+class MP4Handler(RatingHandler):
+    _RATE_TAG = "----:com.apple.iTunes:RATE"
+    _FAV_TAG = "----:com.apple.iTunes:FAVORITE"
+
+    def read_rating(self, file_path: str) -> int | None:
+        try:
+            audio = MP4(file_path)
+            rating_raw = audio.tags.get(self._RATE_TAG) if audio.tags else None
+            if rating_raw:
+                m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+                if m4a_rating == 0: return None
+                return max(1, min(10, round(m4a_rating / 10)))
+        except Exception as e: logger.error(f"MP4 read rating err ({file_path}): {e}")
+        return None
+
+    def write_rating(self, file_path: str, rating: int) -> None:
+        try:
+            audio = MP4(file_path)
+            if audio.tags is None: audio.add_tags()
+            m4a_rating = "0" if rating is None or rating == 0 else str(max(10, min(100, rating * 10)))
+            audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
+            audio.save()
+        except Exception as e: logger.error(f"MP4 write rating err ({file_path}): {e}")
+
+    def read_starred(self, file_path: str) -> int:
+        try:
+            audio = MP4(file_path)
+            if audio.tags and self._FAV_TAG in audio.tags:
+                return 1 if audio.tags[self._FAV_TAG][0].decode('utf-8') == "1" else 0
+        except Exception: pass
+        return 0
+
+    def write_starred(self, file_path: str, starred: bool) -> None:
+        try:
+            audio = MP4(file_path)
+            if audio.tags is None: audio.add_tags()
+            audio[self._FAV_TAG] = [bytes("1" if starred else "0", 'utf-8')]
+            audio.save()
+        except Exception as e: logger.error(f"MP4 write star err ({file_path}): {e}")
+
+# --- РЕЕСТР И ФАСАД ---
+HANDLER_REGISTRY = {
+    ".mp3": MP3Handler(), ".aif": AIFFHandler(), ".aiff": AIFFHandler(),
+    ".flac": XiphHandler(), ".ogg": XiphHandler(), ".opus": XiphHandler(),
+    ".m4a": MP4Handler(),
+}
+
+def get_handler(file_path: str) -> RatingHandler | None:
+    ext = os.path.splitext(file_path)[1].lower()
+    return HANDLER_REGISTRY.get(ext)
+
+def get_rating_from_file(file_path: str) -> int | None:
+    handler = get_handler(file_path)
+    return handler.read_rating(file_path) if handler else None
+
+def set_rating_to_file(file_path: str, rating: int) -> None:
+    handler = get_handler(file_path)
+    if handler: handler.write_rating(file_path, rating)
+
+def get_starred_from_file(file_path: str) -> int:
+    handler = get_handler(file_path)
+    return handler.read_starred(file_path) if handler else 0
+
+def set_starred_to_file(file_path: str, starred: bool) -> None:
+    handler = get_handler(file_path)
+    if handler: handler.write_starred(file_path, starred)
         
-        if starred:
-            # ИСПРАВЛЕНО: Для MusicBee пишем 'L', для остальных '1'
-            val = "L" if player == 'musicbee' else "1"
-            audio.tags.add(TXXX(encoding=3, desc=desc, text=val))
-
-# --- XIPH (FLAC, OGG, OPUS) ---
-def _get_rating_from_xiph(audio):
-    if not audio: return None
-    rating_raw = audio.get("RATING")
-    if rating_raw:
-        xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-        if xiph_rating > 0:
-            return max(1, min(10, round(xiph_rating / 10)))
-    return None
-
-def _set_rating_to_xiph(audio, internal_rating):
-    if not audio: return
-    if "RATING" in audio:
-        del audio["RATING"]
-        
-    if internal_rating is not None and internal_rating > 0:
-        audio["RATING"] = str(max(10, min(100, internal_rating * 10)))
-
-def _get_starred_from_xiph(audio):
-    if not audio: return 0
-    for player in _ACTIVE_PLAYERS:
-        tag_name = _PLAYER_PROFILES[player]['like_vorbis']
-        # ИСПРАВЛЕНО: Добавлено распознавание "L" для MusicBee
-        if tag_name in audio and str(audio[tag_name][0]) in ("1", "1.0", "L"):
-            return 1
-    return 0
-
-def _set_starred_to_xiph(audio, starred):
-    for player in _ACTIVE_PLAYERS:
-        tag_name = _PLAYER_PROFILES[player]['like_vorbis']
-        if not starred and tag_name in audio:
-            del audio[tag_name]
-        elif starred:
-            # ИСПРАВЛЕНО: Для MusicBee пишем 'L', для остальных '1'
-            audio[tag_name] = "L" if player == 'musicbee' else "1"
-
-# --- M4A (AAC/ALAC) ---
-def _get_rating_from_m4a(audio):
-    if not audio.tags: return None
-    rating_raw = audio.tags.get("----:com.apple.iTunes:rate")
-    if rating_raw:
-        m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-        if m4a_rating > 0:
-            return max(1, min(10, round(m4a_rating / 10)))
-    return None
-
-def _set_rating_to_m4a(audio, internal_rating):
-    if audio.tags is None: audio.add_tags()
-    if "----:com.apple.iTunes:rate" in audio.tags:
-        del audio.tags["----:com.apple.iTunes:rate"]
-        
-    if internal_rating is not None and internal_rating > 0:
-        m4a_rating = str(max(10, min(100, internal_rating * 10)))
-        audio["----:com.apple.iTunes:rate"] = [m4a_rating.encode("utf-8")]
-
-def _get_starred_from_m4a(audio):
-    if not audio.tags: return 0
-    for player in _ACTIVE_PLAYERS:
-        tag_name = _PLAYER_PROFILES[player]['like_mp4']
-        if tag_name in audio.tags:
-            val = audio.tags[tag_name][0].decode('utf-8')
-            # ИСПРАВЛЕНО: Добавлено распознавание "L" для MusicBee
-            if val in ("1", "1.0", "L"):
-                return 1
-    return 0
-
-def _set_starred_to_m4a(audio, starred):
-    for player in _ACTIVE_PLAYERS:
-        tag_name = _PLAYER_PROFILES[player]['like_mp4']
-        if not starred and tag_name in audio.tags:
-            del audio.tags[tag_name]
-        elif starred:
-            # ИСПРАВЛЕНО: Для MusicBee пишем b'L', для остальных b'1'
-            val = b"L" if player == 'musicbee' else b"1"
-            audio.tags[tag_name] = [val]
-
-# --- ЭКСПОРТИРУЕМЫЕ ФУНКЦИИ (ТОЧКА ВХОДА) ---
-def get_rating_from_file(file_path):
-    try:
-        if file_path.endswith(".mp3"):
-            audio = MP3(file_path, ID3=ID3)
-            return _get_rating_from_id3(audio)
-        elif file_path.endswith(".aif") or file_path.endswith(".aiff"):
-            audio = AIFF(file_path)
-            return _get_rating_from_id3(audio)
-        elif any(file_path.endswith(ext) for ext in _XIPH_FORMATS):
-            audio = MutagenFile(file_path)
-            return _get_rating_from_xiph(audio)
-        elif file_path.endswith(".m4a"):
-            audio = MP4(file_path)
-            return _get_rating_from_m4a(audio)
-    except Exception as e:
-        logger.error(f"Read rating err ({file_path}): {e}")
-    return None
-
-def set_rating_to_file(file_path, internal_rating):
-    try:
-        if file_path.endswith(".mp3"):
-            audio = MP3(file_path, ID3=ID3)
-            _set_rating_to_id3(audio, internal_rating)
-            audio.save()
-        elif file_path.endswith(".aif") or file_path.endswith(".aiff"):
-            audio = AIFF(file_path)
-            _set_rating_to_id3(audio, internal_rating)
-            audio.save()
-        elif any(file_path.endswith(ext) for ext in _XIPH_FORMATS):
-            audio = MutagenFile(file_path)
-            _set_rating_to_xiph(audio, internal_rating)
-            audio.save()
-        elif file_path.endswith(".m4a"):
-            audio = MP4(file_path)
-            _set_rating_to_m4a(audio, internal_rating)
-            audio.save()
-    except Exception as e:
-        logger.error(f"Write rating err ({file_path}): {e}")
-
-def get_starred_from_file(file_path):
-    try:
-        if file_path.endswith(".mp3"):
-            audio = MP3(file_path, ID3=ID3)
-            return _get_starred_from_id3(audio)
-        elif file_path.endswith(".aif") or file_path.endswith(".aiff"):
-            audio = AIFF(file_path)
-            return _get_starred_from_id3(audio)
-        elif any(file_path.endswith(ext) for ext in _XIPH_FORMATS):
-            audio = MutagenFile(file_path)
-            return _get_starred_from_xiph(audio)
-        elif file_path.endswith(".m4a"):
-            audio = MP4(file_path)
-            return _get_starred_from_m4a(audio)
-    except Exception as e:
-        logger.error(f"Read star err ({file_path}): {e}")
-    return 0
-
-def set_starred_to_file(file_path, starred):
-    try:
-        if file_path.endswith(".mp3"):
-            audio = MP3(file_path, ID3=ID3)
-            _set_starred_to_id3(audio, starred)
-            audio.save()
-        elif file_path.endswith(".aif") or file_path.endswith(".aiff"):
-            audio = AIFF(file_path)
-            _set_starred_to_id3(audio, starred)
-            audio.save()
-        elif any(file_path.endswith(ext) for ext in _XIPH_FORMATS):
-            audio = MutagenFile(file_path)
-            _set_starred_to_xiph(audio, starred)
-            audio.save()
-        elif file_path.endswith(".m4a"):
-            audio = MP4(file_path)
-            _set_starred_to_m4a(audio, starred)
-            audio.save()
-    except Exception as e:
-        logger.error(f"Write star err ({file_path}): {e}")
