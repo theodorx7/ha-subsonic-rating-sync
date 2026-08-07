@@ -101,8 +101,8 @@ class ID3Handler(RatingHandler):
         try:
             audio = self._load(file_path)
             if audio and audio.tags:
-                fav_frames = audio.tags.getall("TXXX:FAVORITE")
-                if fav_frames: return 1 if str(fav_frames[0].text[0]) == "1" else 0
+                like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG_ID3}")
+                if like_frames: return 1 if str(like_frames[0].text[0]) == _LIKE_VALUE_ON else 0
         except Exception: pass
         return 0
 
@@ -111,33 +111,11 @@ class ID3Handler(RatingHandler):
             audio = self._load(file_path)
             if audio is None: return
             if audio.tags is None: audio.tags = ID3()
-            audio.tags.delall("TXXX:FAVORITE")
-            audio.tags.add(TXXX(encoding=3, desc="FAVORITE", text="1" if starred else "0"))
+            audio.tags.delall(f"TXXX:{_LIKE_TAG_ID3}")
+            value = _LIKE_VALUE_ON if starred else "0"
+            audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG_ID3, text=value))
             audio.save()
         except Exception as e: logger.error(f"ID3 write star err ({file_path}): {e}")
-
-    def read_liked(self, file_path: str) -> int:
-        try:
-            audio = self._load(file_path)
-            if audio and audio.tags:
-                like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG_ID3}")
-                if like_frames: return 1 if str(like_frames[0].text[0]) == _LIKE_VALUE_ON else 0
-        except Exception: pass
-        return 0
-    def write_liked(self, file_path: str, liked: bool) -> None:
-        try:
-            audio = self._load(file_path)
-            if audio is None: return
-            if audio.tags is None: audio.tags = ID3()
-            
-            # Удаляем старые фреймы, чтобы не плодить дубликаты
-            audio.tags.delall(f"TXXX:{_LIKE_TAG_ID3}")
-            
-            value = _LIKE_VALUE_ON if liked else "0"
-            audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG_ID3, text=value))
-            
-            audio.save()
-        except Exception as e: logger.error(f"ID3 write like err ({file_path}): {e}")
 
 class MP3Handler(ID3Handler):
     def _load(self, file_path): return MP3(file_path, ID3=ID3)
@@ -177,7 +155,8 @@ class XiphHandler(RatingHandler):
     def read_starred(self, file_path: str) -> int:
         try:
             audio = MutagenFile(file_path)
-            if audio and "FAVORITE" in audio: return 1 if str(audio["FAVORITE"][0]) == "1" else 0
+            if audio and _LIKE_TAG_XIPH in audio:
+                return 1 if str(audio[_LIKE_TAG_XIPH][0]) == _LIKE_VALUE_ON else 0
         except Exception: pass
         return 0
 
@@ -185,30 +164,14 @@ class XiphHandler(RatingHandler):
         try:
             audio = MutagenFile(file_path)
             if audio:
-                audio["FAVORITE"] = "1" if starred else "0"
-                audio.save()
-        except Exception as e: logger.error(f"Xiph write star err ({file_path}): {e}")
-
-    def read_liked(self, file_path: str) -> int:
-        try:
-            audio = MutagenFile(file_path)
-            if audio and _LIKE_TAG_XIPH in audio:
-                return 1 if str(audio[_LIKE_TAG_XIPH][0]) == _LIKE_VALUE_ON else 0
-        except Exception: pass
-        return 0
-    def write_liked(self, file_path: str, liked: bool) -> None:
-        try:
-            audio = MutagenFile(file_path)
-            if audio:
-                value = _LIKE_VALUE_ON if liked else "0"
+                value = _LIKE_VALUE_ON if starred else "0"
                 audio[_LIKE_TAG_XIPH] = value
                 audio.save()
-        except Exception as e: logger.error(f"Xiph write like err ({file_path}): {e}")
+        except Exception as e: logger.error(f"Xiph write star err ({file_path}): {e}")
 
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
 class MP4Handler(RatingHandler):
     _RATE_TAG = "----:com.apple.iTunes:RATE"
-    _FAV_TAG = "----:com.apple.iTunes:FAVORITE"
 
     def read_rating(self, file_path: str) -> int | None:
         try:
@@ -240,8 +203,8 @@ class MP4Handler(RatingHandler):
     def read_starred(self, file_path: str) -> int:
         try:
             audio = MP4(file_path)
-            if audio.tags and self._FAV_TAG in audio.tags:
-                return 1 if audio.tags[self._FAV_TAG][0].decode('utf-8') == "1" else 0
+            if audio.tags and _LIKE_TAG_MP4 in audio.tags:
+                return 1 if audio.tags[_LIKE_TAG_MP4][0].decode('utf-8') == _LIKE_VALUE_ON else 0
         except Exception: pass
         return 0
 
@@ -249,27 +212,10 @@ class MP4Handler(RatingHandler):
         try:
             audio = MP4(file_path)
             if audio.tags is None: audio.add_tags()
-            audio[self._FAV_TAG] = [bytes("1" if starred else "0", 'utf-8')]
+            value = _LIKE_VALUE_ON if starred else "0"
+            audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
             audio.save()
         except Exception as e: logger.error(f"MP4 write star err ({file_path}): {e}")
-
-    def read_liked(self, file_path: str) -> int:
-        try:
-            audio = MP4(file_path)
-            if audio.tags and _LIKE_TAG_MP4 in audio.tags:
-                return 1 if audio.tags[_LIKE_TAG_MP4][0].decode('utf-8') == _LIKE_VALUE_ON else 0
-        except Exception: pass
-        return 0
-    def write_liked(self, file_path: str, liked: bool) -> None:
-        try:
-            audio = MP4(file_path)
-            if audio.tags is None: audio.add_tags()
-            
-            value = _LIKE_VALUE_ON if liked else "0"
-            audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
-            
-            audio.save()
-        except Exception as e: logger.error(f"MP4 write like err ({file_path}): {e}")
 
 # --- РЕЕСТР И ФАСАД ---
 HANDLER_REGISTRY = {
@@ -297,10 +243,3 @@ def get_starred_from_file(file_path: str) -> int:
 def set_starred_to_file(file_path: str, starred: bool) -> None:
     handler = get_handler(file_path)
     if handler: handler.write_starred(file_path, starred)
-
-def get_liked_from_file(file_path: str) -> int:
-    handler = get_handler(file_path)
-    return handler.read_liked(file_path) if handler else 0
-def set_liked_to_file(file_path: str, liked: bool) -> None:
-    handler = get_handler(file_path)
-    if handler: handler.write_liked(file_path, liked)
