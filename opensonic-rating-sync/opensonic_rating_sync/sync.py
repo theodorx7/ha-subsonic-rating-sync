@@ -163,14 +163,58 @@ class SyncAgent:
             t_rate_internal = f_rating_internal if f_rating_internal else (srv_rating * 2 if srv_rating > 0 else 0)
             w_file_rate, w_srv_rate = False, False
         else:
+            # Разница > 0.5 - это конфликт или одностороннее изменение.
             f_rating_os = math.ceil(f_rating_internal / 2) if f_rating_internal else 0
-            db_f_rating_os = math.ceil(db_state['file_rating'] / 2) if db_state['file_rating'] else 0
+            db_srv_rating = db_state['server_rating'] or 0
+            db_f_rating = db_state['file_rating'] or 0
             
-            t_rate_os, w_file_rate, w_srv_rate = self._resolve_conflict(
-                srv_rating, f_rating_os, db_state['server_rating'], db_f_rating_os
-            )
-            # Если сервер победил, конвертируем его 0-5 в 1-10 для файла
-            t_rate_internal = t_rate_os * 2 if t_rate_os > 0 else 0
+            srv_changed = (srv_rating != db_srv_rating)
+            f_changed = (f_rating_internal != db_f_rating)
+            
+            # 1. Изменился только сервер -> победа сервера
+            if srv_changed and not f_changed:
+                t_rate_os = srv_rating
+                t_rate_internal = srv_rating * 2 if srv_rating > 0 else 0
+                w_file_rate, w_srv_rate = True, False
+                
+            # 2. Изменился только файл -> победа файла
+            elif not srv_changed and f_changed:
+                t_rate_os = f_rating_os
+                t_rate_internal = f_rating_internal if f_rating_internal else 0
+                w_file_rate, w_srv_rate = False, True
+                
+            # 3. Изменились ОБА (или первый запуск с чистой БД)
+            else:
+                # Проверяем, физически ли менялся файл на диске с прошлого раза
+                is_new_file = (db_state['file_mtime_ns'] == 0)
+                file_mtime_changed = (not is_new_file) and (current_mtime != db_state['file_mtime_ns'])
+                
+                # Если файл точно меняли руками (обновилось mtime) -> он побеждает
+                if file_mtime_changed:
+                    t_rate_os = f_rating_os
+                    t_rate_internal = f_rating_internal if f_rating_internal else 0
+                    w_file_rate, w_srv_rate = False, True
+                    
+                # ПЕРВЫЙ ЗАПУСК: данные есть и там, и там, но разные.
+                # НЕ затираем ничего. Просто запоминаем текущее состояние, 
+                # чтобы дождаться явного решения от пользователя.
+                elif is_new_file:
+                    t_rate_os = srv_rating
+                    t_rate_internal = f_rating_internal if f_rating_internal else 0
+                    w_file_rate, w_srv_rate = False, False
+                    
+                else:
+                    # Если оба изменились в процессе работы, но mtime файла не свежее 
+                    # -> применяем глобальную настройку разрешения конфликтов
+                    conflict_res = self.config.get('conflict_resolution', 'server_wins')
+                    if conflict_res == 'server_wins':
+                        t_rate_os = srv_rating
+                        t_rate_internal = srv_rating * 2 if srv_rating > 0 else 0
+                        w_file_rate, w_srv_rate = True, False
+                    else: # file_wins
+                        t_rate_os = f_rating_os
+                        t_rate_internal = f_rating_internal if f_rating_internal else 0
+                        w_file_rate, w_srv_rate = False, True
 
         t_star, w_file_star, w_srv_star = self._resolve_conflict(
             srv_starred, f_starred, db_state['server_starred'], db_state['file_starred']
@@ -179,6 +223,26 @@ class SyncAgent:
         # Учитываем sync_mode
         write_file = (w_file_star or w_file_rate) and self.sync_mode in ['two-way', 'server-to-file']
         write_server = (w_srv_star or w_srv_rate) and self.sync_mode in ['two-way', 'file-to-server']
+
+        # --- НОВОЕ: Принудительное сохранение в БД при первом запуске ---
+        # Если это первый запуск (БД была пуста), и мы решили ничего не менять (чтобы не затереть данные),
+        # нам все равно нужно сохранить текущее состояние в БД, чтобы трек больше не считался новым.
+        is_new_file = (db_state['file_mtime_ns'] == 0)
+        if is_new_file and not write_file and not write_server and self.sync_mode == 'two-way':
+            if not self.config.get('dry_run', False):
+                final_f_rating = t_rate_internal
+                upsert_track_state(
+                    song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
+                    f_starred=t_star, f_rating=final_f_rating,
+                    s_starred=t_star, s_rating=t_rate_os
+                )
+                # Меняем уровень на INFO, чтобы пользователь точно заметил
+                logger.info(
+                    f"ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_internal}. "
+                    f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
+                    f"({self._track_label(song, file_path)})"
+                )
+            return False, False
 
         if not write_file and not write_server:
             return False, False
