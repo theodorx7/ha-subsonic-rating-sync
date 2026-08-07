@@ -144,7 +144,11 @@ class SyncAgent:
 
         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
             f_starred = ratings.get_starred_from_file(file_path)
-            f_rating_internal = ratings.get_rating_from_file(file_path)  # Шкала 1-10
+            f_liked = ratings.get_liked_from_file(file_path)
+            # Комбинируем: лайк в файле считается выставленным, если стоит FAVORITE ИЛИ LOVE RATING (MusicBee)
+            if f_liked:
+                f_starred = 1
+            f_rating_internal = ratings.get_rating_from_file(file_path)
         else:
             f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
             f_rating_internal = db_state['file_rating']
@@ -199,6 +203,7 @@ class SyncAgent:
                     # ВАЖНО: Передаем None вместо 0, чтобы ratings.py удалил тег рейтинга
                     t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
                     ratings.set_starred_to_file(file_path, t_star)
+                    ratings.set_liked_to_file(file_path, bool(t_star))
                     ratings.set_rating_to_file(file_path, t_rate_internal_none)
                     current_mtime = os.stat(file_path).st_mtime_ns
 
