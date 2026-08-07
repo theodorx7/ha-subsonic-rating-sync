@@ -21,7 +21,6 @@ options:
   server_port: 4533
   user: "test"
   password: "test"
-  api_key: ""
   music_folder_id: "2"
   music_folder: ""
   players:
@@ -36,7 +35,6 @@ schema:
   server_port: int?
   user: str
   password: password
-  api_key: password
   music_folder_id: str
   music_folder: str?
   players:
