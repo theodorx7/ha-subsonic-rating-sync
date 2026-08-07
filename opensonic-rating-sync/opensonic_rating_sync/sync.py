@@ -73,8 +73,8 @@ class SyncAgent:
                 logger.error(f"Ошибка при обработке трека {self._track_label(song)}: {e}", exc_info=True)
 
         logger.info("Цикл синхронизации завершен:")
-        logger.info(f"   -  Обновлено файлов на ДИСКЕ {disk_updates}")
-        logger.info(f"   -  Обновлено файлов на СЕРВЕРЕ {server_updates}")
+        logger.info(f"   -  Обновлено файлов на ДИСКЕ: {disk_updates}")
+        logger.info(f"   -  Обновлено файлов на СЕРВЕРЕ: {server_updates}")
 
     def _fetch_starred_ids(self):
         starred_ids = set()
