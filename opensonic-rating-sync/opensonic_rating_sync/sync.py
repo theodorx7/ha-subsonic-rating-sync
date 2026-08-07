@@ -116,7 +116,8 @@ class SyncAgent:
 
     def _process_song(self, song, starred_ids):
         srv_starred = 1 if song.id in starred_ids else 0
-        srv_rating = getattr(song, 'userRating', 0) or getattr(song, 'user_rating', 0) or 0
+        # ИСПРАВЛЕНИЕ: Жестко приводим к int, чтобы избежать TypeError при делении
+        srv_rating = int(getattr(song, 'userRating', 0) or getattr(song, 'user_rating', 0) or 0)
     
         if not getattr(song, 'path', None):
             logger.warning(f"Трек {song.id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
@@ -145,7 +146,6 @@ class SyncAgent:
         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
             f_starred = ratings.get_starred_from_file(file_path)
             f_liked = ratings.get_liked_from_file(file_path)
-            # Комбинируем: лайк в файле считается выставленным, если стоит FAVORITE ИЛИ LOVE RATING (MusicBee)
             if f_liked:
                 f_starred = 1
             f_rating_internal = ratings.get_rating_from_file(file_path)
@@ -153,99 +153,84 @@ class SyncAgent:
             f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
             f_rating_internal = db_state['file_rating']
 
-        # --- ВАЖНОЕ ИСПРАВЛЕНИЕ: Нормализуем None в 0 для корректного сравнения ---
+        # ИСПРАВЛЕНИЕ: Нормализуем None в 0
         f_rating_internal = f_rating_internal if f_rating_internal is not None else 0
 
-        # --- НОВАЯ ЛОГИКА ДОПУСКА (TOLERANCE) 0.5 ---
+        is_new_file = (db_state['file_mtime_ns'] == 0)
+        
+        # --- ЛОГИКА ДОПУСКА (TOLERANCE) 0.5 ---
         f_rating_5_scale = f_rating_internal / 2.0
         
-        # Если разница <= 0.5 звезды, считаем, что данные синхронизированы
         if abs(f_rating_5_scale - srv_rating) <= 0.5:
             t_rate_os = srv_rating
-            # Сохраняем оригинальный файловый рейтинг (если он есть), либо конвертируем серверный
-            t_rate_internal = f_rating_internal if f_rating_internal else (srv_rating * 2 if srv_rating > 0 else 0)
+            t_rate_internal = f_rating_internal or (srv_rating * 2)
             w_file_rate, w_srv_rate = False, False
         else:
-            # Разница > 0.5 - это конфликт или одностороннее изменение.
-            f_rating_os = math.ceil(f_rating_internal / 2) if f_rating_internal else 0
+            # ИСПРАВЛЕНИЕ: Убрано избыточное условие, т.к. math.ceil(0/2) = 0
+            f_rating_os = math.ceil(f_rating_internal / 2)
             db_srv_rating = db_state['server_rating'] or 0
             db_f_rating = db_state['file_rating'] or 0
             
             srv_changed = (srv_rating != db_srv_rating)
             f_changed = (f_rating_internal != db_f_rating)
             
-            is_new_file = (db_state['file_mtime_ns'] == 0)
-            
-            # 1. Изменился только сервер -> победа сервера
             if srv_changed and not f_changed:
                 t_rate_os = srv_rating
-                t_rate_internal = srv_rating * 2 if srv_rating > 0 else 0
+                t_rate_internal = srv_rating * 2
                 w_file_rate, w_srv_rate = True, False
-                
-            # 2. Изменился только файл -> победа файла
             elif not srv_changed and f_changed:
                 t_rate_os = f_rating_os
-                t_rate_internal = f_rating_internal if f_rating_internal else 0
+                t_rate_internal = f_rating_internal
                 w_file_rate, w_srv_rate = False, True
-                
-            # 3. Изменились ОБА (или первый запуск с чистой БД)
             else:
                 file_mtime_changed = (not is_new_file) and (current_mtime != db_state['file_mtime_ns'])
                 
-                # Если файл точно меняли руками (обновилось mtime) -> он побеждает
                 if file_mtime_changed:
                     t_rate_os = f_rating_os
-                    t_rate_internal = f_rating_internal if f_rating_internal else 0
+                    t_rate_internal = f_rating_internal
                     w_file_rate, w_srv_rate = False, True
-                    
-                # ПЕРВЫЙ ЗАПУСК в режиме two-way: данные есть и там, и там, но разные.
-                # НЕ затираем ничего. Замораживаем.
                 elif is_new_file and self.sync_mode == 'two-way':
                     t_rate_os = srv_rating
-                    t_rate_internal = f_rating_internal if f_rating_internal else 0
+                    t_rate_internal = f_rating_internal
                     w_file_rate, w_srv_rate = False, False
-                    
                 else:
-                    # В остальных случаях (односторонние режимы или рабочие конфликты) 
-                    # -> применяем глобальную настройку разрешения конфликтов
                     conflict_res = self.config.get('conflict_resolution', 'server_wins')
                     if conflict_res == 'server_wins':
                         t_rate_os = srv_rating
-                        t_rate_internal = srv_rating * 2 if srv_rating > 0 else 0
+                        t_rate_internal = srv_rating * 2
                         w_file_rate, w_srv_rate = True, False
                     else: # file_wins
                         t_rate_os = f_rating_os
-                        t_rate_internal = f_rating_internal if f_rating_internal else 0
+                        t_rate_internal = f_rating_internal
                         w_file_rate, w_srv_rate = False, True
 
         t_star, w_file_star, w_srv_star = self._resolve_conflict(
             srv_starred, f_starred, db_state['server_starred'], db_state['file_starred']
         )
 
-        # Учитываем sync_mode
         write_file = (w_file_star or w_file_rate) and self.sync_mode in ['two-way', 'server-to-file']
         write_server = (w_srv_star or w_srv_rate) and self.sync_mode in ['two-way', 'file-to-server']
 
-        # --- Принудительное сохранение в БД при первом запуске (двусторонний режим) ---
-        if is_new_file and not write_file and not write_server and self.sync_mode == 'two-way':
-            if not self.config.get('dry_run', False):
-                final_f_rating = t_rate_internal
-                upsert_track_state(
-                    song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-                    f_starred=t_star, f_rating=final_f_rating,
-                    s_starred=t_star, s_rating=t_rate_os
-                )
-            
-            # Выводим лог даже в dry_run, чтобы пользователь видел замороженные конфликты
-            prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
-            logger.info(
-                f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_internal}. "
-                f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
-                f"({self._track_label(song, file_path)})"
-            )
-            return False, False
-
+        # --- ИСПРАВЛЕНИЕ: Единый блок обработки "Нет изменений" ---
         if not write_file and not write_server:
+            # Если это первый запуск (БД пуста), но мы решили ничего не менять (конфликт или уже синхронизировано),
+            # нам ВСЕГДА нужно сохранить текущее состояние в БД, чтобы трек больше не считался новым!
+            if is_new_file:
+                if not self.config.get('dry_run', False):
+                    upsert_track_state(
+                        song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
+                        f_starred=t_star, f_rating=t_rate_internal,
+                        s_starred=t_star, s_rating=t_rate_os
+                    )
+                
+                # Выводим лог конфликта только если данные реально расходятся более чем на 0.5 звезды
+                if abs(f_rating_5_scale - srv_rating) > 0.5:
+                    prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
+                    logger.info(
+                        f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_internal}. "
+                        f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
+                        f"({self._track_label(song, file_path)})"
+                    )
             return False, False
 
         prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
@@ -256,7 +241,7 @@ class SyncAgent:
             f"{prefix}ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
             f"{self._track_label(song, file_path)}"
         )
-        # Если Dry-Run — на этом заканчиваем
+        
         if self.config.get('dry_run', False):
             return write_file, write_server
 
@@ -265,7 +250,6 @@ class SyncAgent:
         try:
             with lock:
                 if write_file:
-                    # ВАЖНО: Передаем None вместо 0, чтобы ratings.py удалил тег рейтинга
                     t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
                     ratings.set_starred_to_file(file_path, t_star)
                     ratings.set_liked_to_file(file_path, bool(t_star))
@@ -280,10 +264,10 @@ class SyncAgent:
             logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
             return False, False
 
-        final_f_rating = t_rate_internal
+        # ИСПРАВЛЕНИЕ: Убрана избыточная переменная final_f_rating
         upsert_track_state(
             song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-            f_starred=t_star, f_rating=final_f_rating,
+            f_starred=t_star, f_rating=t_rate_internal,
             s_starred=t_star, s_rating=t_rate_os
         )
         return write_file, write_server
