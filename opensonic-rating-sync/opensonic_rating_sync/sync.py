@@ -187,24 +187,28 @@ class SyncAgent:
             f"{prefix}ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
             f"{self._track_label(song, file_path)}"
         )
-
+        # Если Dry-Run — на этом заканчиваем
         if self.config.get('dry_run', False):
             return write_file, write_server
 
+        # Боевой режим
         lock = get_file_lock(song.id)
         try:
             with lock:
                 if write_file:
                     # ВАЖНО: Передаем None вместо 0, чтобы ratings.py удалил тег рейтинга
-                    t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
+                    t_rate_internal = t_rate_os * 2 if t_rate_os > 0 else None
                     ratings.set_starred_to_file(file_path, t_star)
-                    ratings.set_rating_to_file(file_path, t_rate_internal_none)
+                    ratings.set_rating_to_file(file_path, t_rate_internal)
                     current_mtime = os.stat(file_path).st_mtime_ns
                 
                 if write_server:
-                    if t_star == 1 and srv_starred == 0: self.conn.star(sids=[song.id])
-                    elif t_star == 0 and srv_starred == 1: self.conn.unstar(sids=[song.id])
-                    if t_rate_os != srv_rating: self.conn.set_rating(song.id, t_rate_os)
+                    if t_star == 1 and srv_starred == 0: 
+                        self.conn.star(sids=[song.id])
+                    elif t_star == 0 and srv_starred == 1: 
+                        self.conn.unstar(sids=[song.id])
+                    if t_rate_os != srv_rating: 
+                        self.conn.set_rating(song.id, t_rate_os)
         except Exception as e:
             logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
             return False, False
