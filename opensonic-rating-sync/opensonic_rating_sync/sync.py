@@ -115,7 +115,7 @@ class SyncAgent:
 
     def _process_song(self, song, starred_ids):
         srv_starred = 1 if song.id in starred_ids else 0
-        srv_rating = getattr(song, 'userRating', getattr(song, 'user_rating', 0)) or 0
+        srv_rating = getattr(song, 'userRating', 0) or getattr(song, 'user_rating', 0) or 0
     
         if not getattr(song, 'path', None):
             logger.warning(f"Трек {song.id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
