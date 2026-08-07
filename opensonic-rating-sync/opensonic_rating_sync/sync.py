@@ -144,10 +144,8 @@ class SyncAgent:
         }
 
         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
+            # Теперь get_starred_from_file читает тег LOVE RATING
             f_starred = ratings.get_starred_from_file(file_path)
-            f_liked = ratings.get_liked_from_file(file_path)
-            if f_liked:
-                f_starred = 1
             f_rating_internal = ratings.get_rating_from_file(file_path)
         else:
             f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
@@ -251,8 +249,7 @@ class SyncAgent:
             with lock:
                 if write_file:
                     t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
-                    ratings.set_starred_to_file(file_path, t_star)
-                    ratings.set_liked_to_file(file_path, bool(t_star))
+                    ratings.set_starred_to_file(file_path, bool(t_star))
                     ratings.set_rating_to_file(file_path, t_rate_internal_none)
                     current_mtime = os.stat(file_path).st_mtime_ns
 
