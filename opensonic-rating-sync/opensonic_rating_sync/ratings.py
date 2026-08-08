@@ -24,10 +24,10 @@ _LIKE_VALUE_ON = "L"                                      # MusicBee пишет 
 # --- БАЗОВЫЙ КЛАСС СТРАТЕГИИ ---
 class RatingHandler:
     def read_rating(self, file_path: str) -> int | None: raise NotImplementedError
-    def write_rating(self, file_path: str, rating: int) -> None: raise NotImplementedError
     def read_starred(self, file_path: str) -> int: raise NotImplementedError
-    def write_starred(self, file_path: str, starred: bool) -> None: raise NotImplementedError
     def read_all(self, file_path: str): raise NotImplementedError
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None: raise NotImplementedError
+    def write_all(self, file_path: str, rating: int, starred: bool) -> None: raise NotImplementedError
     def _load(self, file_path: str): raise NotImplementedError
 
     def _safe_save(self, audio, file_path: str):
@@ -77,38 +77,6 @@ class ID3Handler(RatingHandler):
         except Exception as e: logger.error(f"ID3 read rating err ({file_path}): {e}")
         return None
 
-    def write_rating(self, file_path: str, rating: int) -> None:
-        try:
-            audio = self._load(file_path)
-            if audio is None: return
-            if audio.tags is None: audio.tags = ID3()
-
-            # Получаем ВСЕ существующие фреймы рейтингов (от любых программ)
-            popm_frames = audio.tags.getall("POPM")
-
-            if rating is None or rating == 0:
-                # --- СЛУЧАЙ 1: Рейтинг 0 ---
-                # Если есть хоть какие-то рейтинги — удаляем ВСЕ найденные POPM фреймы.
-                # Метод delall("POPM") вычистит все фреймы рейтинга без разбора email.
-                if popm_frames:
-                    audio.tags.delall("POPM")
-            else:
-                # --- СЛУЧАЙ 2: Рейтинг > 0 ---
-                popm_rating = _internal_rating_to_popm(rating)
-                
-                if popm_frames:
-                    # Нашли чужие теги? НЕ создаем свой!
-                    # Проходим по всем найденным фреймам и перезаписываем их значения.
-                    for frame in popm_frames:
-                        frame.rating = popm_rating
-                        frame.count = 0 # Обнуляем счетчик воспроизведения для чистоты
-                else:
-                    # Нет никаких тегов? Создаем свой (Navidrome)
-                    audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
-            
-            self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"ID3 write rating err ({file_path}): {e}")
-
     def read_starred(self, file_path: str) -> int:
         try:
             audio = self._load(file_path)
@@ -117,17 +85,6 @@ class ID3Handler(RatingHandler):
                 if like_frames: return 1 if str(like_frames[0].text[0]) == _LIKE_VALUE_ON else 0
         except Exception: pass
         return 0
-
-    def write_starred(self, file_path: str, starred: bool) -> None:
-        try:
-            audio = self._load(file_path)
-            if audio is None: return
-            if audio.tags is None: audio.tags = ID3()
-            audio.tags.delall(f"TXXX:{_LIKE_TAG_ID3}")
-            value = _LIKE_VALUE_ON if starred else "0"
-            audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG_ID3, text=value))
-            self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"ID3 write star err ({file_path}): {e}")
 
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
@@ -150,6 +107,36 @@ class ID3Handler(RatingHandler):
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
         return None, 0
 
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+        try:
+            audio = self._load(file_path)
+            if audio is None: return
+            if audio.tags is None: audio.tags = ID3()
+
+            # --- Условие 1: Если передан рейтинг ---
+            if rating is not None:
+                popm_frames = audio.tags.getall("POPM")
+                if rating == 0:
+                    if popm_frames: audio.tags.delall("POPM")
+                else:
+                    popm_rating = _internal_rating_to_popm(rating)
+                    if popm_frames:
+                        for frame in popm_frames:
+                            frame.rating = popm_rating
+                            frame.count = 0
+                    else:
+                        audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
+
+            # --- Условие 2: Если передан лайк ---
+            if starred is not None:
+                audio.tags.delall(f"TXXX:{_LIKE_TAG_ID3}")
+                value = _LIKE_VALUE_ON if starred else "0"
+                audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG_ID3, text=value))
+            
+            # --- Единая атомарная запись ---
+            self._safe_save(audio, file_path)
+        except Exception as e: logger.error(f"ID3 write tags err ({file_path}): {e}")
+
 class MP3Handler(ID3Handler):
     def _load(self, file_path): return MP3(file_path, ID3=ID3)
 
@@ -170,21 +157,6 @@ class XiphHandler(RatingHandler):
         except Exception as e: logger.error(f"Xiph read rating err ({file_path}): {e}")
         return None
 
-    def write_rating(self, file_path: str, rating: int) -> None:
-        try:
-            audio = self._load(file_path)
-            if audio:
-                # Удаляем тег RATING, если он есть
-                if "RATING" in audio:
-                    del audio["RATING"]
-                    
-                # Пишем новый тег только если рейтинг валиден
-                if rating is not None and rating > 0:
-                    xiph_rating = str(max(10, min(100, rating * 10)))
-                    audio["RATING"] = xiph_rating
-                self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"Xiph write rating err ({file_path}): {e}")
-
     def read_starred(self, file_path: str) -> int:
         try:
             audio = self._load(file_path)
@@ -192,17 +164,6 @@ class XiphHandler(RatingHandler):
                 return 1 if str(audio[_LIKE_TAG_XIPH][0]) == _LIKE_VALUE_ON else 0
         except Exception: pass
         return 0
-
-    def write_starred(self, file_path: str, starred: bool) -> None:
-        try:
-            audio = self._load(file_path)
-            if audio:
-                value = _LIKE_VALUE_ON if starred else "0"
-                audio[_LIKE_TAG_XIPH] = value
-                self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"Xiph write star err ({file_path}): {e}")
-   
-    def _load(self, file_path): return MutagenFile(file_path)
 
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
@@ -222,6 +183,27 @@ class XiphHandler(RatingHandler):
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
 
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+        try:
+            audio = self._load(file_path)
+            if audio:
+                # --- Условие 1: Если передан рейтинг ---
+                if rating is not None:
+                    if "RATING" in audio:
+                        del audio["RATING"]
+                    if rating > 0:
+                        audio["RATING"] = str(max(10, min(100, rating * 10)))
+                
+                # --- Условие 2: Если передан лайк ---
+                if starred is not None:
+                    audio[_LIKE_TAG_XIPH] = _LIKE_VALUE_ON if starred else "0"
+
+                # --- Единая атомарная запись ---
+                self._safe_save(audio, file_path)
+        except Exception as e: logger.error(f"Xiph write tags err ({file_path}): {e}")
+
+    def _load(self, file_path): return MutagenFile(file_path)
+
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
 class MP4Handler(RatingHandler):
     _RATE_TAG = "----:com.apple.iTunes:RATE"
@@ -237,22 +219,6 @@ class MP4Handler(RatingHandler):
         except Exception as e: logger.error(f"MP4 read rating err ({file_path}): {e}")
         return None
 
-    def write_rating(self, file_path: str, rating: int) -> None:
-        try:
-            audio = self._load(file_path)
-            if audio.tags is None: audio.add_tags()
-            
-            # Удаляем тег RATE, если он есть
-            if self._RATE_TAG in audio.tags:
-                del audio.tags[self._RATE_TAG]
-                
-            # Пишем новый тег только если рейтинг валиден
-            if rating is not None and rating > 0:
-                m4a_rating = str(max(10, min(100, rating * 10)))
-                audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
-            self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"MP4 write rating err ({file_path}): {e}")
-
     def read_starred(self, file_path: str) -> int:
         try:
             audio = self._load(file_path)
@@ -261,14 +227,27 @@ class MP4Handler(RatingHandler):
         except Exception: pass
         return 0
 
-    def write_starred(self, file_path: str, starred: bool) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
         try:
             audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
-            value = _LIKE_VALUE_ON if starred else "0"
-            audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
+            
+            # --- Условие 1: Если передан рейтинг ---
+            if rating is not None:
+                if self._RATE_TAG in audio.tags:
+                    del audio.tags[self._RATE_TAG]
+                if rating > 0:
+                    m4a_rating = str(max(10, min(100, rating * 10)))
+                    audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
+                
+            # --- Условие 2: Если передан лайк ---
+            if starred is not None:
+                value = _LIKE_VALUE_ON if starred else "0"
+                audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
+
+            # --- Единая атомарная запись ---
             self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"MP4 write star err ({file_path}): {e}")
+        except Exception as e: logger.error(f"MP4 write tags err ({file_path}): {e}")
 
     def _load(self, file_path): return MP4(file_path)
 
@@ -305,17 +284,13 @@ def get_rating_from_file(file_path: str) -> int | None:
     handler = get_handler(file_path)
     return handler.read_rating(file_path) if handler else None
 
-def set_rating_to_file(file_path: str, rating: int) -> None:
-    handler = get_handler(file_path)
-    if handler: handler.write_rating(file_path, rating)
-
 def get_starred_from_file(file_path: str) -> int:
     handler = get_handler(file_path)
     return handler.read_starred(file_path) if handler else 0
 
-def set_starred_to_file(file_path: str, starred: bool) -> None:
+def set_tags_to_file(file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
     handler = get_handler(file_path)
-    if handler: handler.write_starred(file_path, starred)
+    if handler: handler.write_tags(file_path, rating, starred)
 
 # НОВАЯ ФУНКЦИЯ ФАСАДА
 def get_all_ratings_from_file(file_path: str):
