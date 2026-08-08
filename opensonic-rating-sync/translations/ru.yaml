@@ -7,13 +7,13 @@ configuration:
     description: Базовый URL вашего Navidrome/Subsonic сервера.
   server_port:
     name: Server port
-    description: Базовый URL вашего Navidrome/Subsonic сервера.
+    description: Базовый URL сервера Navidrome/Subsonic.
   user:
     name: User
     description: Имя пользователя для API-доступа.
   password:
     name: Password
-    description: Пароль пользователя.
+    description:
   music_folder:
     name: Music folder
     description: Путь к папке с музыкой внутри контейнера (обычно /media/...).
