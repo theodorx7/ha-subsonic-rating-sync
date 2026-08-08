@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import tempfile
 from mutagen import File as MutagenFile
 from mutagen.aiff import AIFF
@@ -30,16 +31,18 @@ class RatingHandler:
     def _safe_save(self, audio, file_path: str):
         """Атомарная запись файла для 100% защиты от бинарной порчи."""
         dir_name = os.path.dirname(file_path)
-        # Создаем временный файл в той же директории (это важно для атомарности os.replace)
+        # Создаем временный файл в той же директории
         fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix=".ha_sync_tmp_")
         try:
             os.close(fd)
-            # 1. Сохраняем теги во временный файл (mutagen пишет весь файл целиком)
+            # 1. Копируем оригинальный файл целиком во временный (чтобы перенести аудиоданные!)
+            shutil.copy2(file_path, tmp_path)
+            # 2. Сохраняем измененные теги во временный файл (mutagen перепишет теги в копии, не трогая аудио)
             audio.save(tmp_path)
-            # 2. Атомарно заменяем оригинальный файл временным (занимает доли миллисекунды)
+            # 3. Атомарно заменяем оригинальный файл временным
             os.replace(tmp_path, file_path)
         except Exception:
-            # Если на этапе записи упала ошибка (например, нет места на диске) - удаляем мусор
+            # Если на этапе записи упала ошибка - удаляем мусор
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
             raise # Пробрасываем ошибку дальше, чтобы сработал try-except в вызывающем методе
