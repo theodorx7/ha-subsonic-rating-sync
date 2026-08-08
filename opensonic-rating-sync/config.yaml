@@ -22,8 +22,6 @@ options:
   password: "test"
   music_folder_id: "2"
   music_folder: ""
-  players:
-    - "musicbee"
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
   sync_interval_minutes: "60"
@@ -37,8 +35,6 @@ schema:
   password: password
   music_folder_id: str
   music_folder: str?
-  players:
-    - list(musicbee|plex|mediamonkey|navidrome|foobar2000|wmp)
   sync_mode: list(two-way|file-to-server|server-to-file)
   conflict_resolution: list(server_wins|file_wins)
   sync_interval_minutes: int?
