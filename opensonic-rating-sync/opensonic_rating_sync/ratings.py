@@ -160,7 +160,9 @@ class XiphHandler(RatingHandler):
     def _load(self, file_path): return MutagenFile(file_path)
 
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
-class MP4Handler(RatingHandler): _RATE_TAG = "----:com.apple.iTunes:RATE"
+class MP4Handler(RatingHandler):
+    _RATE_TAG = "----:com.apple.iTunes:RATE"
+    
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
