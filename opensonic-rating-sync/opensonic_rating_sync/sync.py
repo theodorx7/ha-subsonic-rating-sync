@@ -3,7 +3,6 @@ import logging
 import math
 import time
 from urllib.parse import unquote
-from .locker import get_file_lock
 from .database import get_track_state, upsert_track_state
 from . import ratings
 import libopensonic
@@ -313,36 +312,34 @@ class SyncAgent:
             return write_file, write_server
 
         # Боевой режим
-        lock = get_file_lock(song.id)
         actual_file_write = False
         actual_srv_write = False
         try:
-            with lock:
-                if write_file:
-                    if w_file_star:
-                        ratings.set_starred_to_file(file_path, bool(t_star))
-                        actual_file_write = True
-                    if w_file_rate:
-                        t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
-                        ratings.set_rating_to_file(file_path, t_rate_internal_none)
-                        actual_file_write = True
-                    if actual_file_write:
-                        current_mtime = os.stat(file_path).st_mtime_ns
+            if write_file:
+                if w_file_star:
+                    ratings.set_starred_to_file(file_path, bool(t_star))
+                    actual_file_write = True
+                if w_file_rate:
+                    t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
+                    ratings.set_rating_to_file(file_path, t_rate_internal_none)
+                    actual_file_write = True
+                if actual_file_write:
+                    current_mtime = os.stat(file_path).st_mtime_ns
 
-                if write_server:
-                    if w_srv_star:
-                        if t_star == 1 and srv_starred == 0: 
-                            self.conn.star(sids=[song.id])
-                            actual_srv_write = True
-                        elif t_star == 0 and srv_starred == 1: 
-                            self.conn.unstar(sids=[song.id])
-                            actual_srv_write = True
-                    if w_srv_rate:
-                        if t_rate_os != srv_rating: 
-                            self.conn.set_rating(song.id, t_rate_os)
-                            actual_srv_write = True
+            if write_server:
+                if w_srv_star:
+                    if t_star == 1 and srv_starred == 0: 
+                        self.conn.star(sids=[song.id])
+                        actual_srv_write = True
+                    elif t_star == 0 and srv_starred == 1: 
+                        self.conn.unstar(sids=[song.id])
+                        actual_srv_write = True
+                if w_srv_rate:
+                    if t_rate_os != srv_rating: 
+                        self.conn.set_rating(song.id, t_rate_os)
+                        actual_srv_write = True
         except Exception as e:
-            logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
+            logger.error(f"Ошибка записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
             return False, False
 
         upsert_track_state(
