@@ -343,14 +343,6 @@ class SyncAgent:
             logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
             return False, False
 
-        # Синхронизируем метки времени при успешной записи
-        if write_file and not write_server:
-            final_f_rate_mtime = final_s_rate_mtime
-            final_f_star_mtime = final_s_star_mtime
-        elif write_server and not write_file:
-            final_s_rate_mtime = final_f_rate_mtime
-            final_s_star_mtime = final_f_star_mtime
-
         upsert_track_state(
             song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
             f_starred=t_star if write_file else f_starred, 
