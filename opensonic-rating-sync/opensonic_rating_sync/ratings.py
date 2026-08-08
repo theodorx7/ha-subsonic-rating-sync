@@ -132,8 +132,6 @@ class ID3Handler(RatingHandler):
         return None, 0
 
 class MP3Handler(ID3Handler):
-
-class MP3Handler(ID3Handler):
     def _load(self, file_path): return MP3(file_path, ID3=ID3)
 
 class AIFFHandler(ID3Handler):
