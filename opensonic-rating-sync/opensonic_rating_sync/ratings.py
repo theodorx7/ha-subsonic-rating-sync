@@ -14,7 +14,7 @@ _ALTERNATIVE_MP3_RATING_MAP = {0: 0, 2: 1, 4: 64, 6: 128, 8: 196, 10: 255}
 _PICARD_MP3_RATING_MAP = {0: 0, 2: 51, 4: 102, 6: 153, 8: 204, 10: 255}
 _KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email", "Navidrome"]
 _RATING_EMAIL = "Navidrome" 
-# --- Теги лайка в формате MusicBee (бинарный like: "L"=love, отсутствие тега=нет лайка) ---
+# --- Теги лайка в формате MusicBee (бинарный like: "L"=love, "0"=нет лайка) ---
 _LIKE_TAG_ID3  = "LOVE RATING"                            # TXXX:LOVE RATING (MP3/AIFF)
 _LIKE_TAG_XIPH = "LOVE RATING"                            # Vorbis Comment (FLAC/OGG/OPUS)
 _LIKE_TAG_MP4  = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
