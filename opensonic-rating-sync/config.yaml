@@ -24,7 +24,7 @@ options:
   music_folder: ""
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
-  sync_interval_minutes: "60"
+  sync_interval_minutes: "1500"
   dry_run: true
   debug: true
 schema:
