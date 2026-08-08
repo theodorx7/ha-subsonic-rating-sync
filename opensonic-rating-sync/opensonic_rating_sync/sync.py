@@ -267,6 +267,9 @@ class SyncAgent:
             w_file_star, w_srv_star = False, False
             final_f_star_mtime, final_s_star_mtime = new_f_star_mtime, new_s_star_mtime
 
+        write_file = (w_file_star or w_file_rate) and self.sync_mode in ['two-way', 'server-to-file']
+        write_server = (w_srv_star or w_srv_rate) and self.sync_mode in ['two-way', 'file-to-server']
+
         # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (С учетом блокировки режима) ---
         if not write_file and not write_server:
             if not self.config.get('dry_run', False):
