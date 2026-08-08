@@ -227,7 +227,8 @@ class SyncAgent:
                 w_file_rate, w_srv_rate = False, False
                 final_f_rate_mtime = 0
                 final_s_rate_mtime = 0
-                logger.info(f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
+                if is_new_file:
+                    logger.info(f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
             else:
                 t_rate_os = srv_rating
                 t_rate_internal = f_rating_internal or (srv_rating * 2)
@@ -259,7 +260,8 @@ class SyncAgent:
             w_file_star, w_srv_star = False, False
             final_f_star_mtime = 0
             final_s_star_mtime = 0
-            logger.info(f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ЛАЙКОВ (Нет данных о времени): Сервер={srv_starred}, Файл={f_starred}. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
+            if is_new_file:
+                logger.info(f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ЛАЙКОВ (Нет данных о времени): Сервер={srv_starred}, Файл={f_starred}. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
         else:
             t_star = srv_starred
             w_file_star, w_srv_star = False, False
@@ -291,7 +293,6 @@ class SyncAgent:
             
             return False, False
 
-        prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
         wf_str = self._get_action_str(w_file_star, w_file_rate, t_star, t_rate_os)
         ws_str = self._get_action_str(w_srv_star, w_srv_rate, t_star, t_rate_os)
         
