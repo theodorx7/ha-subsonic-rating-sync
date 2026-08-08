@@ -114,7 +114,7 @@ class SyncAgent:
             parts.append("❤️" if star_val == 1 else "❌(Лайк)")
         if w_rate:
             parts.append("⭐" * rate_val if rate_val > 0 else "❌(Рейтинг)")
-        if not parts: return "Ничего"
+        if not parts: return "FALSE"
         return " + ".join(parts)
 
     def _resolve_lww(self, srv_val, f_val, db_srv_val, db_f_val, srv_mtime, f_mtime):
