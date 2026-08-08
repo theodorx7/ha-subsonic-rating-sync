@@ -1,6 +1,7 @@
 import os
 import logging
 import math
+import time
 from urllib.parse import unquote
 from .locker import get_file_lock
 from .database import get_track_state, upsert_track_state
@@ -111,6 +112,36 @@ class SyncAgent:
         if not parts: return "Ничего"
         return " + ".join(parts)
 
+    def _resolve_lww(self, srv_val, f_val, db_srv_val, db_f_val, srv_mtime, f_mtime):
+        """Архитектура Last-Write-Wins. Возвращает 'server', 'file' или 'none'."""
+        srv_val = 0 if srv_val is None else srv_val
+        f_val = 0 if f_val is None else f_val
+        db_srv_val = 0 if db_srv_val is None else db_srv_val
+        db_f_val = 0 if db_f_val is None else db_f_val
+
+        srv_changed = (srv_val != db_srv_val)
+        f_changed = (f_val != db_f_val)
+
+        # 1. Никто не менялся
+        if not srv_changed and not f_changed:
+            if srv_val == f_val: return 'none', max(srv_mtime, f_mtime)
+            # Стабильная дивергенция! Побеждает тот, кто менялся последним в прошлом
+            if f_mtime > srv_mtime: return 'file', f_mtime
+            if srv_mtime > f_mtime: return 'server', srv_mtime
+            # Если метки времени равны, используем глобальную настройку
+            return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
+
+        # 2. Изменился только сервер
+        if srv_changed and not f_changed: return 'server', srv_mtime
+        # 3. Изменился только файл
+        if not srv_changed and f_changed: return 'file', f_mtime
+        
+        # 4. Изменились оба (одновременно)
+        if srv_val == f_val: return 'none', max(srv_mtime, f_mtime)
+        if f_mtime > srv_mtime: return 'file', f_mtime
+        if srv_mtime > f_mtime: return 'server', srv_mtime
+        return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
+    
     def _process_song(self, song, starred_ids):
         srv_starred = 1 if song.id in starred_ids else 0
         # ИСПРАВЛЕНИЕ: Жестко приводим к int, чтобы избежать TypeError при делении
@@ -137,7 +168,9 @@ class SyncAgent:
         current_mtime = os.stat(file_path).st_mtime_ns
         db_state = get_track_state(song.id) or {
             'file_mtime_ns': 0, 'file_starred': None, 'file_rating': None,
-            'server_starred': None, 'server_rating': None
+            'server_starred': None, 'server_rating': None,
+            'file_rating_mtime': 0, 'server_rating_mtime': 0,
+            'file_starred_mtime': 0, 'server_starred_mtime': 0
         }
 
         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
@@ -153,15 +186,18 @@ class SyncAgent:
 
         is_new_file = (db_state['file_mtime_ns'] == 0)
         
-        # --- ЛОГИКА ДОПУСКА (TOLERANCE) 0.5 ---
-        f_rating_5_scale = f_rating_internal / 2.0
+        # --- ЛОГИКА LWW (LAST-WRITE-WINS) ---
+        now_time = time.time()
         
+        # 1. РЕЙТИНГ
+        f_rating_5_scale = f_rating_internal / 2.0
         if abs(f_rating_5_scale - srv_rating) <= 0.5:
             t_rate_os = srv_rating
             t_rate_internal = f_rating_internal or (srv_rating * 2)
             w_file_rate, w_srv_rate = False, False
+            final_f_rate_mtime = db_state['file_rating_mtime'] if db_state['file_rating_mtime'] else now_time
+            final_s_rate_mtime = db_state['server_rating_mtime'] if db_state['server_rating_mtime'] else now_time
         else:
-            # ИСПРАВЛЕНИЕ: Убрано избыточное условие, т.к. math.ceil(0/2) = 0
             f_rating_os = math.ceil(f_rating_internal / 2)
             db_srv_rating = db_state['server_rating'] or 0
             db_f_rating = db_state['file_rating'] or 0
@@ -169,60 +205,66 @@ class SyncAgent:
             srv_changed = (srv_rating != db_srv_rating)
             f_changed = (f_rating_internal != db_f_rating)
             
-            if srv_changed and not f_changed:
+            new_f_rate_mtime = now_time if f_changed else (db_state['file_rating_mtime'] or 0)
+            new_s_rate_mtime = now_time if srv_changed else (db_state['server_rating_mtime'] or 0)
+            
+            winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
+            
+            if winner == 'server':
                 t_rate_os = srv_rating
                 t_rate_internal = srv_rating * 2
                 w_file_rate, w_srv_rate = True, False
-            elif not srv_changed and f_changed:
+                final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
+            elif winner == 'file':
                 t_rate_os = f_rating_os
                 t_rate_internal = f_rating_internal
                 w_file_rate, w_srv_rate = False, True
+                final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
             else:
-                # ИСПРАВЛЕНИЕ XAVIER v4 (ЭТАЛОННАЯ ЛОГИКА):
-                # Мы попадаем сюда, если обе стороны изменились одновременно, 
-                # ИЛИ если ни одна не изменилась, но значения расходятся (стабильная дивергенция от прошлого заблокированного режима).
-                
-                if not srv_changed and not f_changed:
-                    # Стабильная дивергенция. Данные не менялись с прошлого цикла.
-                    # Если они расходятся, значит так и должно быть (заблокировано режимом). Ничего не делаем!
-                    t_rate_os = srv_rating
-                    t_rate_internal = f_rating_internal
-                    w_file_rate, w_srv_rate = False, False
-                else:
-                    # Реальный конфликт: обе стороны изменились одновременно с момента последней синхронизации.
-                    conflict_res = self.config.get('conflict_resolution', 'server_wins')
-                    if conflict_res == 'server_wins':
-                        t_rate_os = srv_rating
-                        t_rate_internal = srv_rating * 2
-                        w_file_rate, w_srv_rate = True, False
-                    else: # file_wins
-                        t_rate_os = f_rating_os
-                        t_rate_internal = f_rating_internal
-                        w_file_rate, w_srv_rate = False, True
+                t_rate_os = srv_rating
+                t_rate_internal = f_rating_internal or (srv_rating * 2)
+                w_file_rate, w_srv_rate = False, False
+                final_f_rate_mtime, final_s_rate_mtime = new_f_rate_mtime, new_s_rate_mtime
 
-        t_star, w_file_star, w_srv_star = self._resolve_conflict(
-            srv_starred, f_starred, db_state['server_starred'], db_state['file_starred']
-        )
+        # 2. ЛАЙК
+        db_srv_star = db_state['server_starred']
+        db_f_star = db_state['file_starred']
+        
+        srv_star_changed = (srv_starred != db_srv_star) if db_srv_star is not None else False
+        f_star_changed = (f_starred != db_f_star) if db_f_star is not None else False
+        
+        new_f_star_mtime = now_time if f_star_changed else (db_state['file_starred_mtime'] or 0)
+        new_s_star_mtime = now_time if srv_star_changed else (db_state['server_starred_mtime'] or 0)
+        
+        star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star or 0, db_f_star or 0, new_s_star_mtime, new_f_star_mtime)
+        
+        if star_winner == 'server':
+            t_star = srv_starred
+            w_file_star, w_srv_star = True, False
+            final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
+        elif star_winner == 'file':
+            t_star = f_starred
+            w_file_star, w_srv_star = False, True
+            final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
+        else:
+            t_star = srv_starred
+            w_file_star, w_srv_star = False, False
+            final_f_star_mtime, final_s_star_mtime = new_f_star_mtime, new_s_star_mtime
 
         write_file = (w_file_star or w_file_rate) and self.sync_mode in ['two-way', 'server-to-file']
         write_server = (w_srv_star or w_srv_rate) and self.sync_mode in ['two-way', 'file-to-server']
 
-        # --- ИСПРАВЛЕНИЕ: Единый блок обработки "Нет изменений" ---
+        # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (С учетом блокировки режима) ---
         if not write_file and not write_server:
             if not self.config.get('dry_run', False):
-                # ИСПРАВЛЕНИЕ XAVIER v3: Финальная логика предотвращения зацикливания
                 blocked_by_mode = (w_file_star or w_file_rate or w_srv_star or w_srv_rate)
-                
                 if blocked_by_mode:
-                    # Сохраняем ТЕКУЩИЕ прочитанные значения (чтобы не потерять изменения),
-                    # но НЕ обновляем консенсус, так как синхронизация не произошла.
+                    # Сохраняем ТЕКУЩИЕ значения и ТЕКУЩИЕ метки времени (новые)
                     final_f_star = f_starred
                     final_s_star = srv_starred
                     final_f_rate = f_rating_internal
                     final_s_rate = srv_rating
                 else:
-                    # Изменений не было вообще (или сработал допуск 0.5). 
-                    # Сохраняем текущий консенсус.
                     final_f_star = t_star
                     final_s_star = t_star
                     final_f_rate = t_rate_internal
@@ -231,16 +273,16 @@ class SyncAgent:
                 upsert_track_state(
                     song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
                     f_starred=final_f_star, f_rating=final_f_rate,
-                    s_starred=final_s_star, s_rating=final_s_rate
+                    s_starred=final_s_star, s_rating=final_s_rate,
+                    f_rate_mtime=final_f_rate_mtime, s_rate_mtime=final_s_rate_mtime,
+                    f_star_mtime=final_f_star_mtime, s_star_mtime=final_s_star_mtime
                 )
             
-            # Лог конфликта выводим только при первом запуске и если расхождение больше 0.5
             if is_new_file and abs(f_rating_5_scale - srv_rating) > 0.5:
                 prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
                 logger.info(
                     f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. "
-                    f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
-                    f"({self._track_label(song, file_path)})"
+                    f"Данные оставлены без изменений. ({self._track_label(song, file_path)})"
                 )
             return False, False
 
@@ -289,34 +331,21 @@ class SyncAgent:
             logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
             return False, False
 
-        # ИСПРАВЛЕНИЕ XAVIER: Сохраняем фактические состояния после боевой записи
-        final_f_star = t_star if write_file else f_starred
-        final_s_star = t_star if write_server else srv_starred
-        final_f_rate = t_rate_internal if write_file else f_rating_internal
-        final_s_rate = t_rate_os if write_server else srv_rating
+        # Синхронизируем метки времени при успешной записи
+        if write_file and not write_server:
+            final_f_rate_mtime = final_s_rate_mtime
+            final_f_star_mtime = final_s_star_mtime
+        elif write_server and not write_file:
+            final_s_rate_mtime = final_f_rate_mtime
+            final_s_star_mtime = final_f_star_mtime
 
         upsert_track_state(
             song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-            f_starred=final_f_star, f_rating=final_f_rate,
-            s_starred=final_s_star, s_rating=final_s_rate
+            f_starred=t_star if write_file else f_starred, 
+            f_rating=t_rate_internal if write_file else f_rating_internal,
+            s_starred=t_star if write_server else srv_starred, 
+            s_rating=t_rate_os if write_server else srv_rating,
+            f_rate_mtime=final_f_rate_mtime, s_rate_mtime=final_s_rate_mtime,
+            f_star_mtime=final_f_star_mtime, s_star_mtime=final_s_star_mtime
         )
         return actual_file_write, actual_srv_write
-
-    def _resolve_conflict(self, srv_val, f_val, db_srv_val, db_f_val):
-        srv_val = 0 if srv_val is None else srv_val
-        f_val = 0 if f_val is None else f_val
-        db_srv_val = 0 if db_srv_val is None else db_srv_val
-        db_f_val = 0 if db_f_val is None else db_f_val
-
-        srv_changed = (srv_val != db_srv_val)
-        f_changed = (f_val != db_f_val)
-
-        if not srv_changed and not f_changed: return srv_val, False, False
-        if srv_changed and not f_changed: return srv_val, True, False
-        if not srv_changed and f_changed: return f_val, False, True
-        if srv_changed and f_changed:
-            if srv_val == f_val: return srv_val, False, False
-            conflict_res = self.config.get('conflict_resolution', 'server_wins')
-            if conflict_res == 'server_wins': return srv_val, True, False
-            elif conflict_res == 'file_wins': return f_val, False, True
-        return srv_val, False, False
