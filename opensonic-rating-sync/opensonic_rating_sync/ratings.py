@@ -26,6 +26,7 @@ class RatingHandler:
     def write_rating(self, file_path: str, rating: int) -> None: raise NotImplementedError
     def read_starred(self, file_path: str) -> int: raise NotImplementedError
     def write_starred(self, file_path: str, starred: bool) -> None: raise NotImplementedError
+    def read_all(self, file_path: str): raise NotImplementedError
 
 # --- КОНВЕРСИИ POPM ---
 def _popm_rating_to_internal(popm_rating, email=None):
@@ -109,6 +110,29 @@ class ID3Handler(RatingHandler):
             audio.save()
         except Exception as e: logger.error(f"ID3 write star err ({file_path}): {e}")
 
+    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
+    def read_all(self, file_path: str):
+        try:
+            audio = self._load(file_path)
+            if audio and audio.tags:
+                rating = None
+                starred = 0
+                
+                popm_frames = audio.tags.getall("POPM")
+                if popm_frames:
+                    nav_popm = next((f for f in popm_frames if f.email == _RATING_EMAIL), None)
+                    if nav_popm: rating = _popm_rating_to_internal(nav_popm.rating, _RATING_EMAIL)
+                    else: rating = _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
+                
+                like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG_ID3}")
+                if like_frames: starred = 1 if str(like_frames[0].text[0]) == _LIKE_VALUE_ON else 0
+                
+                return rating, starred
+        except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
+        return None, 0
+
+class MP3Handler(ID3Handler):
+
 class MP3Handler(ID3Handler):
     def _load(self, file_path): return MP3(file_path, ID3=ID3)
 
@@ -161,6 +185,24 @@ class XiphHandler(RatingHandler):
                 audio.save()
         except Exception as e: logger.error(f"Xiph write star err ({file_path}): {e}")
 
+    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
+    def read_all(self, file_path: str):
+        try:
+            audio = MutagenFile(file_path)
+            if audio:
+                rating = None
+                starred = 0
+                rating_raw = audio.get("RATING")
+                if rating_raw:
+                    xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+                    if xiph_rating == 0: rating = None
+                    else: rating = max(1, min(10, round(xiph_rating / 10)))
+                if _LIKE_TAG_XIPH in audio:
+                    starred = 1 if str(audio[_LIKE_TAG_XIPH][0]) == _LIKE_VALUE_ON else 0
+                return rating, starred
+        except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
+        return None, 0
+
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
 class MP4Handler(RatingHandler):
     _RATE_TAG = "----:com.apple.iTunes:RATE"
@@ -209,6 +251,24 @@ class MP4Handler(RatingHandler):
             audio.save()
         except Exception as e: logger.error(f"MP4 write star err ({file_path}): {e}")
 
+    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
+    def read_all(self, file_path: str):
+        try:
+            audio = MP4(file_path)
+            rating = None
+            starred = 0
+            if audio.tags:
+                rating_raw = audio.tags.get(self._RATE_TAG)
+                if rating_raw:
+                    m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+                    if m4a_rating == 0: rating = None
+                    else: rating = max(1, min(10, round(m4a_rating / 10)))
+                if _LIKE_TAG_MP4 in audio.tags:
+                    starred = 1 if audio.tags[_LIKE_TAG_MP4][0].decode('utf-8') == _LIKE_VALUE_ON else 0
+            return rating, starred
+        except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
+        return None, 0
+
 # --- РЕЕСТР И ФАСАД ---
 HANDLER_REGISTRY = {
     ".mp3": MP3Handler(), ".aif": AIFFHandler(), ".aiff": AIFFHandler(),
@@ -235,3 +295,8 @@ def get_starred_from_file(file_path: str) -> int:
 def set_starred_to_file(file_path: str, starred: bool) -> None:
     handler = get_handler(file_path)
     if handler: handler.write_starred(file_path, starred)
+
+# НОВАЯ ФУНКЦИЯ ФАСАДА
+def get_all_ratings_from_file(file_path: str):
+    handler = get_handler(file_path)
+    return handler.read_all(file_path) if handler else (None, 0)
