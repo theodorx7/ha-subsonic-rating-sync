@@ -9,8 +9,8 @@
 
 Syncing 5-star ratings and favorites (LOVE RATING) between audio files and Navidrome (Subsonic/Opensonic API).  
 Supported sync modes: 
-  - two-way (Merge)
-  - one-way (Files → Navidrome) or (Navidrome → Files)
+  - two-way (merge)
+  - one-way (files → Navidrome) or (Navidrome → files)
 
   
     Важно по настройке опции music_folder:
