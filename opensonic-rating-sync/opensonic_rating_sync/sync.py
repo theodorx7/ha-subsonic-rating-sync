@@ -316,13 +316,9 @@ class SyncAgent:
         actual_srv_write = False
         try:
             if write_file:
-                if w_file_star:
-                    ratings.set_starred_to_file(file_path, bool(t_star))
-                    actual_file_write = True
-                if w_file_rate:
-                    t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
-                    ratings.set_rating_to_file(file_path, t_rate_internal_none)
-                    actual_file_write = True
+                r_val = (t_rate_internal if t_rate_internal > 0 else None) if w_file_rate else None
+                s_val = bool(t_star) if w_file_star else None
+                ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val)
                 if actual_file_write:
                     current_mtime = os.stat(file_path).st_mtime_ns
 
