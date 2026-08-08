@@ -14,11 +14,6 @@ class SyncAgent:
         self.config = config
         self.sync_mode = config.get('sync_mode', 'two-way')
         
-        # --- НОВОЕ: Передаем выбранные плееры в модуль рейтингов ---
-        active_players = config.get('players', ['musicbee'])
-        ratings.set_active_players(active_players)
-        # -----------------------------------------------------------
-        
         host = config['server_host'].strip().lower()
         if host.startswith('https://'):
             host = host[8:]
