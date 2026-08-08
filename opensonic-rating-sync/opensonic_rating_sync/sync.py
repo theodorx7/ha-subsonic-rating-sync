@@ -102,12 +102,14 @@ class SyncAgent:
             logger.error(f"Ошибка при получении треков (search3): {e}", exc_info=True)
         return songs
 
-    def _get_action_str(self, do_write, star_val, rate_val):
-        if not do_write: return "FALSE"
-        heart = "❤️" if star_val == 1 else ""
-        stars = "⭐" * rate_val if rate_val > 0 else ""
-        if not heart and not stars: return "❌ (Сброс)"
-        return f"{heart}/{stars}".strip("/")
+    def _get_action_str(self, w_star, w_rate, star_val, rate_val):
+        parts = []
+        if w_star:
+            parts.append("❤️" if star_val == 1 else "❌(Лайк)")
+        if w_rate:
+            parts.append("⭐" * rate_val if rate_val > 0 else "❌(Рейтинг)")
+        if not parts: return "Ничего"
+        return " + ".join(parts)
 
     def _process_song(self, song, starred_ids):
         srv_starred = 1 if song.id in starred_ids else 0
@@ -206,29 +208,30 @@ class SyncAgent:
 
         # --- ИСПРАВЛЕНИЕ: Единый блок обработки "Нет изменений" ---
         if not write_file and not write_server:
-            # Если это первый запуск (БД пуста), но мы решили ничего не менять (конфликт или уже синхронизировано),
-            # нам ВСЕГДА нужно сохранить текущее состояние в БД, чтобы трек больше не считался новым!
-            if is_new_file:
-                if not self.config.get('dry_run', False):
-                    upsert_track_state(
-                        song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-                        f_starred=t_star, f_rating=t_rate_internal,
-                        s_starred=t_star, s_rating=t_rate_os
-                    )
-                
-                # Выводим лог конфликта только если данные реально расходятся более чем на 0.5 звезды
-                if abs(f_rating_5_scale - srv_rating) > 0.5:
-                    prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
-                    logger.info(
-                        f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. "
-                        f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
-                        f"({self._track_label(song, file_path)})"
-                    )
+            # ИСПРАВЛЕНИЕ XAVIER: Убираем условие is_new_file для записи в БД.
+            # Мы ВСЕГДА должны обновлять БД (кроме dry_run), даже если трек не новый,
+            # чтобы зафиксировать консенсус (например, при допуске 0.5 или одностороннем режиме)
+            # и избежать бесконечного цикла синхронизации.
+            if not self.config.get('dry_run', False):
+                upsert_track_state(
+                    song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
+                    f_starred=t_star, f_rating=t_rate_internal,
+                    s_starred=t_star, s_rating=t_rate_os
+                )
+            
+            # Лог конфликта выводим только при первом запуске и если расхождение больше 0.5
+            if is_new_file and abs(f_rating_5_scale - srv_rating) > 0.5:
+                prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
+                logger.info(
+                    f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. "
+                    f"Данные оставлены без изменений. Измените оценку в одном из мест для синхронизации. "
+                    f"({self._track_label(song, file_path)})"
+                )
             return False, False
 
         prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
-        wf_str = self._get_action_str(write_file, t_star, t_rate_os)
-        ws_str = self._get_action_str(write_server, t_star, t_rate_os)
+        wf_str = self._get_action_str(w_file_star, w_file_rate, t_star, t_rate_os)
+        ws_str = self._get_action_str(w_srv_star, w_srv_rate, t_star, t_rate_os)
         
         logger.info(
             f"{prefix}ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
@@ -240,29 +243,43 @@ class SyncAgent:
 
         # Боевой режим
         lock = get_file_lock(song.id)
+        actual_file_write = False
+        actual_srv_write = False
         try:
             with lock:
                 if write_file:
-                    t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
-                    ratings.set_starred_to_file(file_path, bool(t_star))
-                    ratings.set_rating_to_file(file_path, t_rate_internal_none)
-                    current_mtime = os.stat(file_path).st_mtime_ns
+                    if w_file_star:
+                        ratings.set_starred_to_file(file_path, bool(t_star))
+                        actual_file_write = True
+                    if w_file_rate:
+                        t_rate_internal_none = t_rate_internal if t_rate_internal > 0 else None
+                        ratings.set_rating_to_file(file_path, t_rate_internal_none)
+                        actual_file_write = True
+                    if actual_file_write:
+                        current_mtime = os.stat(file_path).st_mtime_ns
 
                 if write_server:
-                    if t_star == 1 and srv_starred == 0: self.conn.star(sids=[song.id])
-                    elif t_star == 0 and srv_starred == 1: self.conn.unstar(sids=[song.id])
-                    if t_rate_os != srv_rating: self.conn.set_rating(song.id, t_rate_os)
+                    if w_srv_star:
+                        if t_star == 1 and srv_starred == 0: 
+                            self.conn.star(sids=[song.id])
+                            actual_srv_write = True
+                        elif t_star == 0 and srv_starred == 1: 
+                            self.conn.unstar(sids=[song.id])
+                            actual_srv_write = True
+                    if w_srv_rate:
+                        if t_rate_os != srv_rating: 
+                            self.conn.set_rating(song.id, t_rate_os)
+                            actual_srv_write = True
         except Exception as e:
             logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
             return False, False
 
-        # ИСПРАВЛЕНИЕ: Убрана избыточная переменная final_f_rating
         upsert_track_state(
             song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
             f_starred=t_star, f_rating=t_rate_internal,
             s_starred=t_star, s_rating=t_rate_os
         )
-        return write_file, write_server
+        return actual_file_write, actual_srv_write
 
     def _resolve_conflict(self, srv_val, f_val, db_srv_val, db_f_val):
         srv_val = 0 if srv_val is None else srv_val
