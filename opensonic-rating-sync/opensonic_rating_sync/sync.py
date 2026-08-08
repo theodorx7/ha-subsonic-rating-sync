@@ -198,61 +198,73 @@ class SyncAgent:
             final_f_rate_mtime = db_state['file_rating_mtime'] if db_state['file_rating_mtime'] else now_time
             final_s_rate_mtime = db_state['server_rating_mtime'] if db_state['server_rating_mtime'] else now_time
         else:
-            f_rating_os = math.ceil(f_rating_internal / 2)
-            db_srv_rating = db_state['server_rating'] or 0
-            db_f_rating = db_state['file_rating'] or 0
-            
-            srv_changed = (srv_rating != db_srv_rating)
-            f_changed = (f_rating_internal != db_f_rating)
-            
-            new_f_rate_mtime = now_time if f_changed else (db_state['file_rating_mtime'] or 0)
-            new_s_rate_mtime = now_time if srv_changed else (db_state['server_rating_mtime'] or 0)
-            
-            winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
-            
-            if winner == 'server':
+            # ПРОВЕРКА ПЕРВОГО ЗАПУСКА (Безопасное предупреждение без записи)
+            if is_new_file and abs(f_rating_5_scale - srv_rating) > 0.5:
                 t_rate_os = srv_rating
-                t_rate_internal = srv_rating * 2
-                w_file_rate, w_srv_rate = True, False
-                final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
-            elif winner == 'file':
-                t_rate_os = f_rating_os
                 t_rate_internal = f_rating_internal
-                w_file_rate, w_srv_rate = False, True
-                final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
-            else:
-                t_rate_os = srv_rating
-                t_rate_internal = f_rating_internal or (srv_rating * 2)
                 w_file_rate, w_srv_rate = False, False
-                final_f_rate_mtime, final_s_rate_mtime = new_f_rate_mtime, new_s_rate_mtime
+                final_f_rate_mtime = now_time
+                final_s_rate_mtime = now_time
+            else:
+                f_rating_os = math.ceil(f_rating_internal / 2)
+                db_srv_rating = db_state['server_rating'] or 0
+                db_f_rating = db_state['file_rating'] or 0
+                
+                srv_changed = (srv_rating != db_srv_rating)
+                f_changed = (f_rating_internal != db_f_rating)
+                
+                new_f_rate_mtime = now_time if f_changed else (db_state['file_rating_mtime'] or 0)
+                new_s_rate_mtime = now_time if srv_changed else (db_state['server_rating_mtime'] or 0)
+                
+                winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
+                
+                if winner == 'server':
+                    t_rate_os = srv_rating
+                    t_rate_internal = srv_rating * 2
+                    w_file_rate, w_srv_rate = True, False
+                    final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
+                elif winner == 'file':
+                    t_rate_os = f_rating_os
+                    t_rate_internal = f_rating_internal
+                    w_file_rate, w_srv_rate = False, True
+                    final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
+                else:
+                    t_rate_os = srv_rating
+                    t_rate_internal = f_rating_internal or (srv_rating * 2)
+                    w_file_rate, w_srv_rate = False, False
+                    final_f_rate_mtime, final_s_rate_mtime = new_f_rate_mtime, new_s_rate_mtime
 
         # 2. ЛАЙК
         db_srv_star = db_state['server_starred']
         db_f_star = db_state['file_starred']
         
-        srv_star_changed = (srv_starred != db_srv_star) if db_srv_star is not None else False
-        f_star_changed = (f_starred != db_f_star) if db_f_star is not None else False
-        
-        new_f_star_mtime = now_time if f_star_changed else (db_state['file_starred_mtime'] or 0)
-        new_s_star_mtime = now_time if srv_star_changed else (db_state['server_starred_mtime'] or 0)
-        
-        star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star or 0, db_f_star or 0, new_s_star_mtime, new_f_star_mtime)
-        
-        if star_winner == 'server':
-            t_star = srv_starred
-            w_file_star, w_srv_star = True, False
-            final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
-        elif star_winner == 'file':
-            t_star = f_starred
-            w_file_star, w_srv_star = False, True
-            final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
-        else:
+        # ПРОВЕРКА ПЕРВОГО ЗАПУСКА (Безопасное предупреждение без записи)
+        if is_new_file and srv_starred != f_starred:
             t_star = srv_starred
             w_file_star, w_srv_star = False, False
-            final_f_star_mtime, final_s_star_mtime = new_f_star_mtime, new_s_star_mtime
-
-        write_file = (w_file_star or w_file_rate) and self.sync_mode in ['two-way', 'server-to-file']
-        write_server = (w_srv_star or w_srv_rate) and self.sync_mode in ['two-way', 'file-to-server']
+            final_f_star_mtime = now_time
+            final_s_star_mtime = now_time
+        else:
+            srv_star_changed = (srv_starred != db_srv_star) if db_srv_star is not None else False
+            f_star_changed = (f_starred != db_f_star) if db_f_star is not None else False
+            
+            new_f_star_mtime = now_time if f_star_changed else (db_state['file_starred_mtime'] or 0)
+            new_s_star_mtime = now_time if srv_star_changed else (db_state['server_starred_mtime'] or 0)
+            
+            star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star or 0, db_f_star or 0, new_s_star_mtime, new_f_star_mtime)
+            
+            if star_winner == 'server':
+                t_star = srv_starred
+                w_file_star, w_srv_star = True, False
+                final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
+            elif star_winner == 'file':
+                t_star = f_starred
+                w_file_star, w_srv_star = False, True
+                final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
+            else:
+                t_star = srv_starred
+                w_file_star, w_srv_star = False, False
+                final_f_star_mtime, final_s_star_mtime = new_f_star_mtime, new_s_star_mtime
 
         # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (С учетом блокировки режима) ---
         if not write_file and not write_server:
