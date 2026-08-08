@@ -178,17 +178,18 @@ class SyncAgent:
                 t_rate_internal = f_rating_internal
                 w_file_rate, w_srv_rate = False, True
             else:
-                file_mtime_changed = (not is_new_file) and (current_mtime != db_state['file_mtime_ns'])
+                # ИСПРАВЛЕНИЕ XAVIER v4 (ЭТАЛОННАЯ ЛОГИКА):
+                # Мы попадаем сюда, если обе стороны изменились одновременно, 
+                # ИЛИ если ни одна не изменилась, но значения расходятся (стабильная дивергенция от прошлого заблокированного режима).
                 
-                if file_mtime_changed:
-                    t_rate_os = f_rating_os
-                    t_rate_internal = f_rating_internal
-                    w_file_rate, w_srv_rate = False, True
-                elif is_new_file and self.sync_mode == 'two-way':
+                if not srv_changed and not f_changed:
+                    # Стабильная дивергенция. Данные не менялись с прошлого цикла.
+                    # Если они расходятся, значит так и должно быть (заблокировано режимом). Ничего не делаем!
                     t_rate_os = srv_rating
                     t_rate_internal = f_rating_internal
                     w_file_rate, w_srv_rate = False, False
                 else:
+                    # Реальный конфликт: обе стороны изменились одновременно с момента последней синхронизации.
                     conflict_res = self.config.get('conflict_resolution', 'server_wins')
                     if conflict_res == 'server_wins':
                         t_rate_os = srv_rating
@@ -209,21 +210,16 @@ class SyncAgent:
         # --- ИСПРАВЛЕНИЕ: Единый блок обработки "Нет изменений" ---
         if not write_file and not write_server:
             if not self.config.get('dry_run', False):
-                # ИСПРАВЛЕНИЕ XAVIER v2: Защита от переключения режимов!
-                # Если мы здесь из-за того, что режим не позволил записать изменение,
-                # мы НЕ ДОЛЖНЫ обновлять значения в БД. Мы сохраняем старые значения из БД,
-                # чтобы при смене режима скрипт увидел расхождение и синхронизировал данные.
-                # Мы обновляем только mtime, чтобы не пересчитывать теги каждую секунду.
-                
-                # Были ли реальные попытки записи, заблокированные режимом?
+                # ИСПРАВЛЕНИЕ XAVIER v3: Финальная логика предотвращения зацикливания
                 blocked_by_mode = (w_file_star or w_file_rate or w_srv_star or w_srv_rate)
                 
                 if blocked_by_mode:
-                    # Сохраняем СТАРЫЕ значения из БД (или 0, если файл новый)
-                    final_f_star = db_state['file_starred'] if db_state['file_starred'] is not None else 0
-                    final_s_star = db_state['server_starred'] if db_state['server_starred'] is not None else 0
-                    final_f_rate = db_state['file_rating'] if db_state['file_rating'] is not None else 0
-                    final_s_rate = db_state['server_rating'] if db_state['server_rating'] is not None else 0
+                    # Сохраняем ТЕКУЩИЕ прочитанные значения (чтобы не потерять изменения),
+                    # но НЕ обновляем консенсус, так как синхронизация не произошла.
+                    final_f_star = f_starred
+                    final_s_star = srv_starred
+                    final_f_rate = f_rating_internal
+                    final_s_rate = srv_rating
                 else:
                     # Изменений не было вообще (или сработал допуск 0.5). 
                     # Сохраняем текущий консенсус.
