@@ -50,6 +50,7 @@ class SyncAgent:
         return f"{artist_title} | {name}"
 
     def run_sync(self):
+        start_time = time.time()
         logger.info(f"Начало цикла синхронизации (режим: {self.sync_mode})...")
         
         starred_ids = self._fetch_starred_ids()
@@ -69,9 +70,13 @@ class SyncAgent:
             except Exception as e:
                 logger.error(f"Ошибка при обработке трека {self._track_label(song)}: {e}", exc_info=True)
 
+        elapsed_time = time.time() - start_time
+        formatted_time = time.strftime('%H:%M:%S', time.gmtime(elapsed_time))
+
         logger.info("Цикл синхронизации завершен:")
-        logger.info(f"   -  Обновлено файлов на ДИСКЕ: {disk_updates}")
-        logger.info(f"   -  Обновлено файлов на СЕРВЕРЕ: {server_updates}")
+        logger.info(f"      Обновлено файлов на ДИСКЕ: {disk_updates}")
+        logger.info(f"      Обновлено файлов на СЕРВЕРЕ: {server_updates}")
+        logger.info(f"      Время выполнения цикла: {formatted_time}")
 
     def _fetch_starred_ids(self):
         starred_ids = set()
