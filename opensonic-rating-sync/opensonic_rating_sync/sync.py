@@ -125,10 +125,10 @@ class SyncAgent:
         # 1. Никто не менялся
         if not srv_changed and not f_changed:
             if srv_val == f_val: return 'none', max(srv_mtime, f_mtime)
-            # Стабильная дивергенция! Побеждает тот, кто менялся последним в прошлом
+            # Стабильная дивергенция! Если меток времени нет (0) - ждет пользователя
+            if f_mtime == 0 and srv_mtime == 0: return 'unresolved', 0
             if f_mtime > srv_mtime: return 'file', f_mtime
             if srv_mtime > f_mtime: return 'server', srv_mtime
-            # Если метки времени равны, используем глобальную настройку
             return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
 
         # 2. Изменился только сервер
@@ -138,6 +138,7 @@ class SyncAgent:
         
         # 4. Изменились оба (одновременно)
         if srv_val == f_val: return 'none', max(srv_mtime, f_mtime)
+        if f_mtime == 0 and srv_mtime == 0: return 'unresolved', 0
         if f_mtime > srv_mtime: return 'file', f_mtime
         if srv_mtime > f_mtime: return 'server', srv_mtime
         return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
@@ -174,9 +175,8 @@ class SyncAgent:
         }
 
         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
-            # Теперь get_starred_from_file читает тег LOVE RATING
-            f_starred = ratings.get_starred_from_file(file_path)
-            f_rating_internal = ratings.get_rating_from_file(file_path)
+            # ОПТИМИЗАЦИЯ: Однократное чтение тегов
+            f_rating_internal, f_starred = ratings.get_all_ratings_from_file(file_path)
         else:
             f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
             f_rating_internal = db_state['file_rating']
@@ -188,6 +188,7 @@ class SyncAgent:
         
         # --- ЛОГИКА LWW (LAST-WRITE-WINS) ---
         now_time = time.time()
+        prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
         
         # 1. РЕЙТИНГ
         f_rating_5_scale = f_rating_internal / 2.0
@@ -195,76 +196,74 @@ class SyncAgent:
             t_rate_os = srv_rating
             t_rate_internal = f_rating_internal or (srv_rating * 2)
             w_file_rate, w_srv_rate = False, False
-            final_f_rate_mtime = db_state['file_rating_mtime'] if db_state['file_rating_mtime'] else now_time
-            final_s_rate_mtime = db_state['server_rating_mtime'] if db_state['server_rating_mtime'] else now_time
+            final_f_rate_mtime = db_state['file_rating_mtime'] if db_state['file_rating_mtime'] else 0
+            final_s_rate_mtime = db_state['server_rating_mtime'] if db_state['server_rating_mtime'] else 0
         else:
-            # ПРОВЕРКА ПЕРВОГО ЗАПУСКА (Безопасное предупреждение без записи)
-            if is_new_file and abs(f_rating_5_scale - srv_rating) > 0.5:
+            f_rating_os = math.ceil(f_rating_internal / 2)
+            db_srv_rating = db_state['server_rating'] or 0
+            db_f_rating = db_state['file_rating'] or 0
+            
+            srv_changed = (srv_rating != db_srv_rating)
+            f_changed = (f_rating_internal != db_f_rating)
+            
+            new_f_rate_mtime = now_time if f_changed else (db_state['file_rating_mtime'] or 0)
+            new_s_rate_mtime = now_time if srv_changed else (db_state['server_rating_mtime'] or 0)
+            
+            winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
+            
+            if winner == 'server':
+                t_rate_os = srv_rating
+                t_rate_internal = srv_rating * 2
+                w_file_rate, w_srv_rate = True, False
+                final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
+            elif winner == 'file':
+                t_rate_os = f_rating_os
+                t_rate_internal = f_rating_internal
+                w_file_rate, w_srv_rate = False, True
+                final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
+            elif winner == 'unresolved':
                 t_rate_os = srv_rating
                 t_rate_internal = f_rating_internal
                 w_file_rate, w_srv_rate = False, False
-                final_f_rate_mtime = now_time
-                final_s_rate_mtime = now_time
+                final_f_rate_mtime = 0
+                final_s_rate_mtime = 0
+                logger.info(f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
             else:
-                f_rating_os = math.ceil(f_rating_internal / 2)
-                db_srv_rating = db_state['server_rating'] or 0
-                db_f_rating = db_state['file_rating'] or 0
-                
-                srv_changed = (srv_rating != db_srv_rating)
-                f_changed = (f_rating_internal != db_f_rating)
-                
-                new_f_rate_mtime = now_time if f_changed else (db_state['file_rating_mtime'] or 0)
-                new_s_rate_mtime = now_time if srv_changed else (db_state['server_rating_mtime'] or 0)
-                
-                winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
-                
-                if winner == 'server':
-                    t_rate_os = srv_rating
-                    t_rate_internal = srv_rating * 2
-                    w_file_rate, w_srv_rate = True, False
-                    final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
-                elif winner == 'file':
-                    t_rate_os = f_rating_os
-                    t_rate_internal = f_rating_internal
-                    w_file_rate, w_srv_rate = False, True
-                    final_f_rate_mtime, final_s_rate_mtime = win_mtime, win_mtime
-                else:
-                    t_rate_os = srv_rating
-                    t_rate_internal = f_rating_internal or (srv_rating * 2)
-                    w_file_rate, w_srv_rate = False, False
-                    final_f_rate_mtime, final_s_rate_mtime = new_f_rate_mtime, new_s_rate_mtime
+                t_rate_os = srv_rating
+                t_rate_internal = f_rating_internal or (srv_rating * 2)
+                w_file_rate, w_srv_rate = False, False
+                final_f_rate_mtime, final_s_rate_mtime = new_f_rate_mtime, new_s_rate_mtime
 
         # 2. ЛАЙК
         db_srv_star = db_state['server_starred']
         db_f_star = db_state['file_starred']
         
-        # ПРОВЕРКА ПЕРВОГО ЗАПУСКА (Безопасное предупреждение без записи)
-        if is_new_file and srv_starred != f_starred:
+        srv_star_changed = (srv_starred != db_srv_star) if db_srv_star is not None else False
+        f_star_changed = (f_starred != db_f_star) if db_f_star is not None else False
+        
+        new_f_star_mtime = now_time if f_star_changed else (db_state['file_starred_mtime'] or 0)
+        new_s_star_mtime = now_time if srv_star_changed else (db_state['server_starred_mtime'] or 0)
+        
+        star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star or 0, db_f_star or 0, new_s_star_mtime, new_f_star_mtime)
+        
+        if star_winner == 'server':
+            t_star = srv_starred
+            w_file_star, w_srv_star = True, False
+            final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
+        elif star_winner == 'file':
+            t_star = f_starred
+            w_file_star, w_srv_star = False, True
+            final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
+        elif star_winner == 'unresolved':
             t_star = srv_starred
             w_file_star, w_srv_star = False, False
-            final_f_star_mtime = now_time
-            final_s_star_mtime = now_time
+            final_f_star_mtime = 0
+            final_s_star_mtime = 0
+            logger.info(f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ЛАЙКОВ (Нет данных о времени): Сервер={srv_starred}, Файл={f_starred}. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
         else:
-            srv_star_changed = (srv_starred != db_srv_star) if db_srv_star is not None else False
-            f_star_changed = (f_starred != db_f_star) if db_f_star is not None else False
-            
-            new_f_star_mtime = now_time if f_star_changed else (db_state['file_starred_mtime'] or 0)
-            new_s_star_mtime = now_time if srv_star_changed else (db_state['server_starred_mtime'] or 0)
-            
-            star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star or 0, db_f_star or 0, new_s_star_mtime, new_f_star_mtime)
-            
-            if star_winner == 'server':
-                t_star = srv_starred
-                w_file_star, w_srv_star = True, False
-                final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
-            elif star_winner == 'file':
-                t_star = f_starred
-                w_file_star, w_srv_star = False, True
-                final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
-            else:
-                t_star = srv_starred
-                w_file_star, w_srv_star = False, False
-                final_f_star_mtime, final_s_star_mtime = new_f_star_mtime, new_s_star_mtime
+            t_star = srv_starred
+            w_file_star, w_srv_star = False, False
+            final_f_star_mtime, final_s_star_mtime = new_f_star_mtime, new_s_star_mtime
 
         # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (С учетом блокировки режима) ---
         if not write_file and not write_server:
@@ -290,12 +289,6 @@ class SyncAgent:
                     f_star_mtime=final_f_star_mtime, s_star_mtime=final_s_star_mtime
                 )
             
-            if is_new_file and abs(f_rating_5_scale - srv_rating) > 0.5:
-                prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
-                logger.info(
-                    f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ПРИ ПЕРВОМ ЗАПУСКЕ: Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. "
-                    f"Данные оставлены без изменений. ({self._track_label(song, file_path)})"
-                )
             return False, False
 
         prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
