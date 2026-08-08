@@ -301,8 +301,8 @@ class SyncAgent:
             
             return False, False
 
-        wf_str = self._get_action_str(w_file_star, w_file_rate, t_star, t_rate_os)
-        ws_str = self._get_action_str(w_srv_star, w_srv_rate, t_star, t_rate_os)
+        wf_str = self._get_action_str(write_file and w_file_star, write_file and w_file_rate, t_star, t_rate_os)
+        ws_str = self._get_action_str(write_server and w_srv_star, write_server and w_srv_rate, t_star, t_rate_os)
         
         logger.info(
             f"{prefix}ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
