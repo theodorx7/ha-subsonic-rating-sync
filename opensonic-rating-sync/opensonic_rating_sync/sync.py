@@ -316,10 +316,13 @@ class SyncAgent:
         actual_srv_write = False
         try:
             if write_file:
-                r_val = (t_rate_internal if t_rate_internal > 0 else None) if w_file_rate else None
+                # Если рейтинг изменился (в т.ч. стал 0), передаем его как есть. None передаем только если рейтинг не менялся (w_file_rate = False).
+                r_val = t_rate_internal if w_file_rate else None
+                # Если лайк изменился, передаем его как bool. None передаем только если лайк не менялся (w_file_star = False).
                 s_val = bool(t_star) if w_file_star else None
+                
                 ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val)
-                actual_file_write = True  # <--- ДОБАВЛЯЕМ УСТАНОВКУ ФЛАГА
+                actual_file_write = True  # Флаг означает, что файл физически обновлен
                 if actual_file_write:
                     current_mtime = os.stat(file_path).st_mtime_ns
 
