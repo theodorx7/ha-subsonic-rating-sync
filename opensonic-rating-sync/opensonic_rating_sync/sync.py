@@ -319,6 +319,7 @@ class SyncAgent:
                 r_val = (t_rate_internal if t_rate_internal > 0 else None) if w_file_rate else None
                 s_val = bool(t_star) if w_file_star else None
                 ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val)
+                actual_file_write = True  # <--- ДОБАВЛЯЕМ УСТАНОВКУ ФЛАГА
                 if actual_file_write:
                     current_mtime = os.stat(file_path).st_mtime_ns
 
