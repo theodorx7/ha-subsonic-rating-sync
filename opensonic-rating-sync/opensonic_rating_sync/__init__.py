@@ -1,1 +1,1 @@
-# Navidrome/Subsonic Rating Sync package
+# Navidrome Rating Sync package
