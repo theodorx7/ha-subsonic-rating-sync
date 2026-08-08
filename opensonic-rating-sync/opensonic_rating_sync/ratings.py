@@ -1,5 +1,6 @@
 import logging
 import os
+import tempfile
 from mutagen import File as MutagenFile
 from mutagen.aiff import AIFF
 from mutagen.id3 import ID3, POPM, TXXX
@@ -27,6 +28,24 @@ class RatingHandler:
     def read_starred(self, file_path: str) -> int: raise NotImplementedError
     def write_starred(self, file_path: str, starred: bool) -> None: raise NotImplementedError
     def read_all(self, file_path: str): raise NotImplementedError
+    def _load(self, file_path: str): raise NotImplementedError
+
+    def _safe_save(self, audio, file_path: str):
+        """Атомарная запись файла для 100% защиты от бинарной порчи."""
+        dir_name = os.path.dirname(file_path)
+        # Создаем временный файл в той же директории (это важно для атомарности os.replace)
+        fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix=".ha_sync_tmp_")
+        try:
+            os.close(fd)
+            # 1. Сохраняем теги во временный файл (mutagen пишет весь файл целиком)
+            audio.save(tmp_path)
+            # 2. Атомарно заменяем оригинальный файл временным (занимает доли миллисекунды)
+            os.replace(tmp_path, file_path)
+        except Exception:
+            # Если на этапе записи упала ошибка (например, нет места на диске) - удаляем мусор
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise # Пробрасываем ошибку дальше, чтобы сработал try-except в вызывающем методе
 
 # --- КОНВЕРСИИ POPM ---
 def _popm_rating_to_internal(popm_rating, email=None):
@@ -87,7 +106,7 @@ class ID3Handler(RatingHandler):
                     # Нет никаких тегов? Создаем свой (Navidrome)
                     audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
             
-            audio.save()
+            self._safe_save(audio, file_path)
         except Exception as e: logger.error(f"ID3 write rating err ({file_path}): {e}")
 
     def read_starred(self, file_path: str) -> int:
@@ -107,7 +126,7 @@ class ID3Handler(RatingHandler):
             audio.tags.delall(f"TXXX:{_LIKE_TAG_ID3}")
             value = _LIKE_VALUE_ON if starred else "0"
             audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG_ID3, text=value))
-            audio.save()
+            self._safe_save(audio, file_path)
         except Exception as e: logger.error(f"ID3 write star err ({file_path}): {e}")
 
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
@@ -141,7 +160,7 @@ class AIFFHandler(ID3Handler):
 class XiphHandler(RatingHandler):
     def read_rating(self, file_path: str) -> int | None:
         try:
-            audio = MutagenFile(file_path)
+            audio = self._load(file_path)
             if audio:
                 rating_raw = audio.get("RATING")
                 if rating_raw:
@@ -153,7 +172,7 @@ class XiphHandler(RatingHandler):
 
     def write_rating(self, file_path: str, rating: int) -> None:
         try:
-            audio = MutagenFile(file_path)
+            audio = self._load(file_path)
             if audio:
                 # Удаляем тег RATING, если он есть
                 if "RATING" in audio:
@@ -163,12 +182,12 @@ class XiphHandler(RatingHandler):
                 if rating is not None and rating > 0:
                     xiph_rating = str(max(10, min(100, rating * 10)))
                     audio["RATING"] = xiph_rating
-                audio.save()
+                self._safe_save(audio, file_path)
         except Exception as e: logger.error(f"Xiph write rating err ({file_path}): {e}")
 
     def read_starred(self, file_path: str) -> int:
         try:
-            audio = MutagenFile(file_path)
+            audio = self._load(file_path)
             if audio and _LIKE_TAG_XIPH in audio:
                 return 1 if str(audio[_LIKE_TAG_XIPH][0]) == _LIKE_VALUE_ON else 0
         except Exception: pass
@@ -176,17 +195,19 @@ class XiphHandler(RatingHandler):
 
     def write_starred(self, file_path: str, starred: bool) -> None:
         try:
-            audio = MutagenFile(file_path)
+            audio = self._load(file_path)
             if audio:
                 value = _LIKE_VALUE_ON if starred else "0"
                 audio[_LIKE_TAG_XIPH] = value
-                audio.save()
+                self._safe_save(audio, file_path)
         except Exception as e: logger.error(f"Xiph write star err ({file_path}): {e}")
+   
+    def _load(self, file_path): return MutagenFile(file_path)
 
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
-            audio = MutagenFile(file_path)
+            audio = self._load(file_path)
             if audio:
                 rating = None
                 starred = 0
@@ -207,7 +228,7 @@ class MP4Handler(RatingHandler):
 
     def read_rating(self, file_path: str) -> int | None:
         try:
-            audio = MP4(file_path)
+            audio = self._load(file_path)
             rating_raw = audio.tags.get(self._RATE_TAG) if audio.tags else None
             if rating_raw:
                 m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
@@ -218,7 +239,7 @@ class MP4Handler(RatingHandler):
 
     def write_rating(self, file_path: str, rating: int) -> None:
         try:
-            audio = MP4(file_path)
+            audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
             
             # Удаляем тег RATE, если он есть
@@ -229,12 +250,12 @@ class MP4Handler(RatingHandler):
             if rating is not None and rating > 0:
                 m4a_rating = str(max(10, min(100, rating * 10)))
                 audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
-            audio.save()
+            self._safe_save(audio, file_path)
         except Exception as e: logger.error(f"MP4 write rating err ({file_path}): {e}")
 
     def read_starred(self, file_path: str) -> int:
         try:
-            audio = MP4(file_path)
+            audio = self._load(file_path)
             if audio.tags and _LIKE_TAG_MP4 in audio.tags:
                 return 1 if audio.tags[_LIKE_TAG_MP4][0].decode('utf-8') == _LIKE_VALUE_ON else 0
         except Exception: pass
@@ -242,17 +263,19 @@ class MP4Handler(RatingHandler):
 
     def write_starred(self, file_path: str, starred: bool) -> None:
         try:
-            audio = MP4(file_path)
+            audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
             value = _LIKE_VALUE_ON if starred else "0"
             audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
-            audio.save()
+            self._safe_save(audio, file_path)
         except Exception as e: logger.error(f"MP4 write star err ({file_path}): {e}")
+
+    def _load(self, file_path): return MP4(file_path)
 
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
-            audio = MP4(file_path)
+            audio = self._load(file_path)
             rating = None
             starred = 0
             if audio.tags:
