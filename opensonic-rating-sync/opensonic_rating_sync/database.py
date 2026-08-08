@@ -30,7 +30,9 @@ def get_track_state(song_id: str):
 
 def upsert_track_state(song_id: str, file_path: str, mtime_ns: int, 
                        f_starred: int, f_rating: int, 
-                       s_starred: int, s_rating: int):
+                       s_starred: int, s_rating: int,
+                       f_rate_mtime: float, s_rate_mtime: float,
+                       f_star_mtime: float, s_star_mtime: float):
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         
@@ -42,21 +44,21 @@ def upsert_track_state(song_id: str, file_path: str, mtime_ns: int,
             # Если запись есть, обновляем её (это спасает от любых ошибок UNIQUE constraint)
             cursor.execute("""
                 UPDATE tracks_state SET 
-                    song_id = ?,
-                    file_path = ?, 
-                    file_mtime_ns = ?, 
-                    file_starred = ?, 
-                    file_rating = ?, 
-                    server_starred = ?, 
-                    server_rating = ?, 
+                    song_id = ?, file_path = ?, file_mtime_ns = ?, 
+                    file_starred = ?, file_rating = ?, server_starred = ?, server_rating = ?, 
+                    file_rating_mtime = ?, server_rating_mtime = ?, 
+                    file_starred_mtime = ?, server_starred_mtime = ?,
                     last_sync_time = CURRENT_TIMESTAMP
                 WHERE song_id = ? OR file_path = ?
-            """, (song_id, file_path, mtime_ns, f_starred, f_rating, s_starred, s_rating, song_id, file_path))
+            """, (song_id, file_path, mtime_ns, f_starred, f_rating, s_starred, s_rating,
+                  f_rate_mtime, s_rate_mtime, f_star_mtime, s_star_mtime, song_id, file_path))
         else:
             # Если записи нет, вставляем новую
             cursor.execute("""
-                INSERT INTO tracks_state (song_id, file_path, file_mtime_ns, file_starred, file_rating, server_starred, server_rating, last_sync_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (song_id, file_path, mtime_ns, f_starred, f_rating, s_starred, s_rating))
+                INSERT INTO tracks_state (song_id, file_path, file_mtime_ns, file_starred, file_rating, server_starred, server_rating, 
+                                           file_rating_mtime, server_rating_mtime, file_starred_mtime, server_starred_mtime, last_sync_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (song_id, file_path, mtime_ns, f_starred, f_rating, s_starred, s_rating,
+                  f_rate_mtime, s_rate_mtime, f_star_mtime, s_star_mtime))
             
         conn.commit()
