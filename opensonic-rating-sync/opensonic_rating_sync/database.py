@@ -16,7 +16,11 @@ def init_db():
                 file_rating INTEGER,
                 server_starred INTEGER,
                 server_rating INTEGER,
-                last_sync_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                last_sync_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                file_rating_mtime REAL DEFAULT 0,
+                server_rating_mtime REAL DEFAULT 0,
+                file_starred_mtime REAL DEFAULT 0,
+                server_starred_mtime REAL DEFAULT 0
             )
         """)
         conn.commit()
