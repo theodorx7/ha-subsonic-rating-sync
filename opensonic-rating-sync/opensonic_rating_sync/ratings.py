@@ -27,7 +27,6 @@ class RatingHandler:
     def read_starred(self, file_path: str) -> int: raise NotImplementedError
     def read_all(self, file_path: str): raise NotImplementedError
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None: raise NotImplementedError
-    def write_all(self, file_path: str, rating: int, starred: bool) -> None: raise NotImplementedError
     def _load(self, file_path: str): raise NotImplementedError
 
     def _safe_save(self, audio, file_path: str):
