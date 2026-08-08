@@ -208,15 +208,34 @@ class SyncAgent:
 
         # --- ИСПРАВЛЕНИЕ: Единый блок обработки "Нет изменений" ---
         if not write_file and not write_server:
-            # ИСПРАВЛЕНИЕ XAVIER: Убираем условие is_new_file для записи в БД.
-            # Мы ВСЕГДА должны обновлять БД (кроме dry_run), даже если трек не новый,
-            # чтобы зафиксировать консенсус (например, при допуске 0.5 или одностороннем режиме)
-            # и избежать бесконечного цикла синхронизации.
             if not self.config.get('dry_run', False):
+                # ИСПРАВЛЕНИЕ XAVIER v2: Защита от переключения режимов!
+                # Если мы здесь из-за того, что режим не позволил записать изменение,
+                # мы НЕ ДОЛЖНЫ обновлять значения в БД. Мы сохраняем старые значения из БД,
+                # чтобы при смене режима скрипт увидел расхождение и синхронизировал данные.
+                # Мы обновляем только mtime, чтобы не пересчитывать теги каждую секунду.
+                
+                # Были ли реальные попытки записи, заблокированные режимом?
+                blocked_by_mode = (w_file_star or w_file_rate or w_srv_star or w_srv_rate)
+                
+                if blocked_by_mode:
+                    # Сохраняем СТАРЫЕ значения из БД (или 0, если файл новый)
+                    final_f_star = db_state['file_starred'] if db_state['file_starred'] is not None else 0
+                    final_s_star = db_state['server_starred'] if db_state['server_starred'] is not None else 0
+                    final_f_rate = db_state['file_rating'] if db_state['file_rating'] is not None else 0
+                    final_s_rate = db_state['server_rating'] if db_state['server_rating'] is not None else 0
+                else:
+                    # Изменений не было вообще (или сработал допуск 0.5). 
+                    # Сохраняем текущий консенсус.
+                    final_f_star = t_star
+                    final_s_star = t_star
+                    final_f_rate = t_rate_internal
+                    final_s_rate = t_rate_os
+                
                 upsert_track_state(
                     song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-                    f_starred=t_star, f_rating=t_rate_internal,
-                    s_starred=t_star, s_rating=t_rate_os
+                    f_starred=final_f_star, f_rating=final_f_rate,
+                    s_starred=final_s_star, s_rating=final_s_rate
                 )
             
             # Лог конфликта выводим только при первом запуске и если расхождение больше 0.5
@@ -274,10 +293,16 @@ class SyncAgent:
             logger.error(f"Ошибка блокировки/записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
             return False, False
 
+        # ИСПРАВЛЕНИЕ XAVIER: Сохраняем фактические состояния после боевой записи
+        final_f_star = t_star if write_file else f_starred
+        final_s_star = t_star if write_server else srv_starred
+        final_f_rate = t_rate_internal if write_file else f_rating_internal
+        final_s_rate = t_rate_os if write_server else srv_rating
+
         upsert_track_state(
             song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
-            f_starred=t_star, f_rating=t_rate_internal,
-            s_starred=t_star, s_rating=t_rate_os
+            f_starred=final_f_star, f_rating=final_f_rate,
+            s_starred=final_s_star, s_rating=final_s_rate
         )
         return actual_file_write, actual_srv_write
 
