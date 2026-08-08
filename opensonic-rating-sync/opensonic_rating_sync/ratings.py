@@ -20,14 +20,6 @@ _LIKE_TAG_XIPH = "LOVE RATING"                            # Vorbis Comment (FLAC
 _LIKE_TAG_MP4  = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
 _LIKE_VALUE_ON = "L"                                      # MusicBee пишет "L" для Love
 
-# Заглушка для будущей реализации мультиплеерности 
-#_active_players = []
-
-def set_active_players(players_list):
-    global _active_players
-    _active_players = players_list or []
-    logger.debug(f"Активные плееры установлены: {_active_players}")
-
 # --- БАЗОВЫЙ КЛАСС СТРАТЕГИИ ---
 class RatingHandler:
     def read_rating(self, file_path: str) -> int | None: raise NotImplementedError
