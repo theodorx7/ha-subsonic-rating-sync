@@ -28,7 +28,6 @@ def load_config() -> dict:
         "password":             raw.get("password", ""),
         "music_folder":         raw.get("music_folder", ""),
         "music_folder_id":      raw.get("music_folder_id", ""),
-        "players":              raw.get("players", ["musicbee"]),  # <--- ДОБАВЛЕНО ЗДЕСЬ
         "sync_mode":            raw.get("sync_mode", ""),
         "conflict_resolution":  raw.get("conflict_resolution", ""),
         "sync_interval_minutes": int(raw.get("sync_interval_minutes") or 60),
