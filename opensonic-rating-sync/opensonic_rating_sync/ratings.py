@@ -123,7 +123,9 @@ class ID3Handler(RatingHandler):
             
             # --- Единая атомарная запись ---
             self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"ID3 write tags err ({file_path}): {e}")
+        except Exception as e: 
+            logger.error(f"ID3 write tags err ({file_path}): {e}")
+            raise
 
 class MP3Handler(ID3Handler):
     def _load(self, file_path): return MP3(file_path, ID3=ID3)
@@ -175,7 +177,9 @@ class XiphHandler(RatingHandler):
 
                 # --- Единая атомарная запись ---
                 self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"Xiph write tags err ({file_path}): {e}")
+        except Exception as e: 
+            logger.error(f"Xiph write tags err ({file_path}): {e}")
+            raise
 
     def _load(self, file_path): return MutagenFile(file_path)
 
@@ -221,7 +225,9 @@ class MP4Handler(RatingHandler):
 
             # --- Единая атомарная запись ---
             self._safe_save(audio, file_path)
-        except Exception as e: logger.error(f"MP4 write tags err ({file_path}): {e}")
+        except Exception as e: 
+            logger.error(f"MP4 write tags err ({file_path}): {e}")
+            raise
 
     def _load(self, file_path): return MP4(file_path)
 
