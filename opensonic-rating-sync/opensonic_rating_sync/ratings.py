@@ -89,19 +89,7 @@ class ID3Handler(RatingHandler):
                     else: rating = _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
                 
                 like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG_ID3}")
-                logger.info(f"DEBUG AIFF: Найдено фреймов LOVE RATING: {len(like_frames)}")
-                if like_frames:
-                    raw_text = like_frames[0].text
-                    logger.info(f"DEBUG AIFF: Тип text = {type(raw_text)}, Значение = {repr(raw_text)}")
-                    if raw_text:
-                        first_val = raw_text[0]
-                        logger.info(f"DEBUG AIFF: Тип [0] = {type(first_val)}, Значение = {repr(first_val)}")
-                        starred = 1 if str(first_val).strip() == _LIKE_VALUE_ON else 0
-                        logger.info(f"DEBUG AIFF: Итог starred = {starred}")
-                    else:
-                        starred = 0
-                else:
-                    starred = 0
+                if like_frames: starred = 1 if str(like_frames[0].text[0]) == _LIKE_VALUE_ON else 0
                 
                 return rating, starred
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
