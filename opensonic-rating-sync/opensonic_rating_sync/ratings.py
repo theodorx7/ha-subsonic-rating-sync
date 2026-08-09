@@ -267,7 +267,7 @@ class ASFHandler(RatingHandler):
                 rating = None
                 starred = 0
                 if audio.tags:
-                    rating_raw = audio.tags.get(self._RATE_TAG)
+                    rating_raw = audio.get(self._RATE_TAG)
                     if rating_raw:
                         try:
                             raw_val = rating_raw[0].value
@@ -285,7 +285,7 @@ class ASFHandler(RatingHandler):
                         except Exception:
                             rating = None
                     
-                    if _LIKE_TAG_ASF in audio.tags:
+                    if _LIKE_TAG_ASF in audio:
                         # ЖЕЛЕЗОБЕТОННОЕ ЧТЕНИЕ: Защита от пробелов, регистра и ТИПА ДАННЫХ
                         try:
                             raw_val = audio[_LIKE_TAG_ASF][0].value
@@ -308,8 +308,8 @@ class ASFHandler(RatingHandler):
             
             # --- Условие 1: Если передан рейтинг ---
             if rating is not None:
-                if self._RATE_TAG in audio.tags:
-                    del audio.tags[self._RATE_TAG]
+                if self._RATE_TAG in audio:
+                    del audio[self._RATE_TAG]
                 if rating > 0:
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
                     # ДОКУМЕНТАЦИЯ MUTAGEN v1.48.1: Значение должно быть обернуто в список [ASFDWordAttribute()]
