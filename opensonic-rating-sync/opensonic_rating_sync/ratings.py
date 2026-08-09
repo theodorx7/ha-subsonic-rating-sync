@@ -16,13 +16,15 @@ logger = logging.getLogger(__name__)
 _PRIMARY_MP3_RATING_MAP = {0: 0, 1: 13, 2: 1, 3: 54, 4: 64, 5: 118, 6: 128, 7: 186, 8: 196, 9: 242, 10: 255}
 _ALTERNATIVE_MP3_RATING_MAP = {0: 0, 2: 1, 4: 64, 6: 128, 8: 196, 10: 255}
 _PICARD_MP3_RATING_MAP = {0: 0, 2: 51, 4: 102, 6: 153, 8: 204, 10: 255}
+_WMA_RATING_WRITE_MAP = {0: 0, 1: 1, 2: 1, 3: 25, 4: 25, 5: 50, 6: 50, 7: 75, 8: 75, 9: 99, 10: 99}
+_WMA_RATING_READ_MAP = {0: 0, 1: 2, 25: 4, 50: 6, 75: 8, 99: 10}
 _KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email"]
 _RATING_EMAIL = "no@email"
-# --- Теги лайка в формате MusicBee (бинарный like: "L"=love, "0"=нет лайка) ---
-_LIKE_TAG_ID3  = "LOVE RATING"                            # TXXX:LOVE RATING (MP3/AIFF)
-_LIKE_TAG_TEXT = "LOVE RATING"                            # Vorbis Comment (FLAC/OGG/OPUS)
-_LIKE_TAG_MP4  = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
-_LIKE_VALUE_ON = "L"                                      # MusicBee пишет "L" для Love
+# --- Теги лайка в формате MusicBee (бинарный like: "L"=love, отсутствие тега или значение "0"=нет лайка) ---
+_LIKE_TAG = "LOVE RATING"                            # Универсальный текстовый тег (MP3/AIFF/WAV, FLAC/OGG/OPUS/APE/WV)
+_LIKE_TAG_ASF = "MUSICBEE/LOVE RATING"                   # WMA (ASF) атрибут MusicBee
+_LIKE_TAG_MP4 = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
+_LIKE_VALUE_ON = "L"
 
 # --- БАЗОВЫЙ КЛАСС СТРАТЕГИИ ---
 class RatingHandler:
@@ -92,7 +94,7 @@ class ID3Handler(RatingHandler):
                 # ИСПРАВЛЕНИЕ: Железобетонное чтение TXXX лайков для AIFF/MP3
                 # Ищем по всем TXXX фреймам, игнорируя регистр описания и лишние пробелы
                 for frame in audio.tags.getall("TXXX"):
-                    if frame.desc and frame.desc.strip().upper() == _LIKE_TAG_ID3.upper():
+                    if frame.desc and frame.desc.strip().upper() == _LIKE_TAG.upper():
                         try:
                             val_str = str(frame.text[0]).strip().upper()
                             if val_str == _LIKE_VALUE_ON:
@@ -129,9 +131,9 @@ class ID3Handler(RatingHandler):
 
             # --- Условие 2: Если передан лайк ---
             if starred is not None:
-                audio.tags.delall(f"TXXX:{_LIKE_TAG_ID3}")
+                audio.tags.delall(f"TXXX:{_LIKE_TAG}")
                 value = _LIKE_VALUE_ON if starred else "0"
-                audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG_ID3, text=value))
+                audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG, text=value))
             
             # --- Единая атомарная запись ---
             self._safe_save(audio, file_path)
@@ -163,10 +165,10 @@ class XiphHandler(RatingHandler):
                     xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
                     if xiph_rating == 0: rating = None
                     else: rating = max(1, min(10, round(xiph_rating / 10)))
-                if _LIKE_TAG_TEXT in audio:
+                if _LIKE_TAG in audio:
                     # ИСПРАВЛЕНИЕ: Железобетонное чтение для Vorbis Comments / APE
                     try:
-                        val_str = str(audio[_LIKE_TAG_TEXT][0]).strip().upper()
+                        val_str = str(audio[_LIKE_TAG][0]).strip().upper()
                         starred = 1 if val_str == _LIKE_VALUE_ON else 0
                     except Exception:
                         starred = 0
@@ -190,7 +192,7 @@ class XiphHandler(RatingHandler):
                 
                 # --- Условие 2: Если передан лайк ---
                 if starred is not None:
-                    audio[_LIKE_TAG_TEXT] = _LIKE_VALUE_ON if starred else "0"
+                    audio[_LIKE_TAG] = _LIKE_VALUE_ON if starred else "0"
 
                 # --- Единая атомарная запись ---
                 self._safe_save(audio, file_path)
@@ -256,7 +258,6 @@ class MP4Handler(RatingHandler):
 # --- СТРАТЕГИЯ WMA (Windows Media Audio / ASF) ---
 class ASFHandler(RatingHandler):
     _RATE_TAG = "WM/SharedUserRating"
-    _LIKE_TAG_ASF = "LOVE RATING"
     
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
@@ -271,14 +272,16 @@ class ASFHandler(RatingHandler):
                         # ИСПРАВЛЕНО: В Mutagen атрибуты ASF возвращаются как объекты.
                         # Свойство .value содержит нативный python-тип (int).
                         wma_rating = int(rating_raw[0].value)
-                        if wma_rating == 0: rating = None
-                        else: rating = max(1, min(10, round(wma_rating / 10)))
+                        rating = _WMA_RATING_READ_MAP.get(wma_rating)
+                        if rating is None: 
+                            rating = max(1, min(10, round(wma_rating / 10)))
+                        if rating == 0: rating = None
                     
-                    if self._LIKE_TAG_ASF in audio.tags:
+                    if _LIKE_TAG_ASF in audio.tags:
                         # ЖЕЛЕЗОБЕТОННОЕ ЧТЕНИЕ: Защита от пробелов и регистра
                         try:
                             # ИСПРАВЛЕНО: Получаем значение через .value
-                            val_str = str(audio[self._LIKE_TAG_ASF][0].value).strip().upper()
+                            val_str = str(audio[_LIKE_TAG_ASF][0].value).strip().upper()
                             starred = 1 if val_str == _LIKE_VALUE_ON else 0
                         except Exception:
                             starred = 0
@@ -296,7 +299,7 @@ class ASFHandler(RatingHandler):
                 if self._RATE_TAG in audio.tags:
                     del audio.tags[self._RATE_TAG]
                 if rating > 0:
-                    wma_rating = max(10, min(100, rating * 10))
+                    wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
                     # ИСПРАВЛЕНО: КРИТИЧЕСКИ ВАЖНО! WMA требует тип DWORD.
                     # Иначе Mutagen запишет QWORD, и плееры не увидят рейтинг.
                     audio[self._RATE_TAG] = ASFDWordAttribute(wma_rating) 
@@ -305,7 +308,7 @@ class ASFHandler(RatingHandler):
             if starred is not None:
                 value = _LIKE_VALUE_ON if starred else "0"
                 # Строки Mutagen автоматически обернет в ASFUnicodeAttribute
-                audio[self._LIKE_TAG_ASF] = value
+                audio[_LIKE_TAG_ASF] = [value]
 
             # --- Единая атомарная запись ---
             self._safe_save(audio, file_path)
