@@ -163,7 +163,12 @@ class XiphHandler(RatingHandler):
                     if xiph_rating == 0: rating = None
                     else: rating = max(1, min(10, round(xiph_rating / 10)))
                 if _LIKE_TAG_TEXT in audio:
-                    starred = 1 if str(audio[_LIKE_TAG_TEXT][0]) == _LIKE_VALUE_ON else 0
+                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для Vorbis Comments / APE
+                    try:
+                        val_str = str(audio[_LIKE_TAG_TEXT][0]).strip().upper()
+                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
+                    except Exception:
+                        starred = 0
                 return rating, starred
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
@@ -211,7 +216,12 @@ class MP4Handler(RatingHandler):
                     if m4a_rating == 0: rating = None
                     else: rating = max(1, min(10, round(m4a_rating / 10)))
                 if _LIKE_TAG_MP4 in audio.tags:
-                    starred = 1 if audio.tags[_LIKE_TAG_MP4][0].decode('utf-8') == _LIKE_VALUE_ON else 0
+                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для M4A атомов
+                    try:
+                        val_str = audio.tags[_LIKE_TAG_MP4][0].decode('utf-8').strip().upper()
+                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
+                    except Exception:
+                        starred = 0
             return rating, starred
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
