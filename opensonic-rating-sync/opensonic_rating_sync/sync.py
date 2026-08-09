@@ -185,8 +185,9 @@ class SyncAgent:
             f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
             f_rating_internal = db_state['file_rating']
 
-        # ИСПРАВЛЕНИЕ: Нормализуем None в 0
+        # ИСПРАВЛЕНИЕ: Нормализуем None в 0 для рейтинга и лайков
         f_rating_internal = f_rating_internal if f_rating_internal is not None else 0
+        f_starred = f_starred if f_starred is not None else 0
 
         is_new_file = (db_state['file_mtime_ns'] == 0)
         
