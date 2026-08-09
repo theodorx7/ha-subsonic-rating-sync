@@ -8,6 +8,7 @@ from mutagen.id3 import ID3, POPM, TXXX
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
 from mutagen.wave import WAVE
+from mutagen.asf import ASF, ASFDWordAttribute
 
 logger = logging.getLogger(__name__)
 
@@ -252,14 +253,76 @@ class MP4Handler(RatingHandler):
 
     def _load(self, file_path): return MP4(file_path)
 
+# --- СТРАТЕГИЯ WMA (Windows Media Audio / ASF) ---
+class ASFHandler(RatingHandler):
+    _RATE_TAG = "WM/SharedUserRating"
+    _LIKE_TAG_ASF = "LOVE RATING"
+    
+    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
+    def read_all(self, file_path: str):
+        try:
+            audio = self._load(file_path)
+            if audio:
+                rating = None
+                starred = 0
+                if audio.tags:
+                    rating_raw = audio.tags.get(self._RATE_TAG)
+                    if rating_raw:
+                        # ИСПРАВЛЕНО: В Mutagen атрибуты ASF возвращаются как объекты.
+                        # Свойство .value содержит нативный python-тип (int).
+                        wma_rating = int(rating_raw[0].value)
+                        if wma_rating == 0: rating = None
+                        else: rating = max(1, min(10, round(wma_rating / 10)))
+                    
+                    if self._LIKE_TAG_ASF in audio.tags:
+                        # ЖЕЛЕЗОБЕТОННОЕ ЧТЕНИЕ: Защита от пробелов и регистра
+                        try:
+                            # ИСПРАВЛЕНО: Получаем значение через .value
+                            val_str = str(audio[self._LIKE_TAG_ASF][0].value).strip().upper()
+                            starred = 1 if val_str == _LIKE_VALUE_ON else 0
+                        except Exception:
+                            starred = 0
+                return rating, starred
+        except Exception as e: logger.error(f"ASF read all err ({file_path}): {e}")
+        return None, 0
+    
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+        try:
+            audio = self._load(file_path)
+            if audio.tags is None: audio.add_tags()
+            
+            # --- Условие 1: Если передан рейтинг ---
+            if rating is not None:
+                if self._RATE_TAG in audio.tags:
+                    del audio.tags[self._RATE_TAG]
+                if rating > 0:
+                    wma_rating = max(10, min(100, rating * 10))
+                    # ИСПРАВЛЕНО: КРИТИЧЕСКИ ВАЖНО! WMA требует тип DWORD.
+                    # Иначе Mutagen запишет QWORD, и плееры не увидят рейтинг.
+                    audio[self._RATE_TAG] = ASFDWordAttribute(wma_rating) 
+                
+            # --- Условие 2: Если передан лайк ---
+            if starred is not None:
+                value = _LIKE_VALUE_ON if starred else "0"
+                # Строки Mutagen автоматически обернет в ASFUnicodeAttribute
+                audio[self._LIKE_TAG_ASF] = value
+
+            # --- Единая атомарная запись ---
+            self._safe_save(audio, file_path)
+        except Exception as e: 
+            logger.error(f"ASF write tags err ({file_path}): {e}")
+            raise
+
+    def _load(self, file_path): return ASF(file_path)
+
 # --- РЕЕСТР И ФАСАД ---
 HANDLER_REGISTRY = {
-    ".mp3": MP3Handler(), ".aif": AIFFHandler(), ".aiff": AIFFHandler(),
-    ".flac": XiphHandler(), ".ogg": XiphHandler(), ".opus": XiphHandler(),
+    ".flac": XiphHandler(), ".ogg": XiphHandler(), ".opus": XiphHandler(), ".ape": XiphHandler(), ".wv": XiphHandler(),
+    ".aif": AIFFHandler(), ".aiff": AIFFHandler(),
+    ".mp3": MP3Handler(),
     ".m4a": MP4Handler(),
-    ".ape": XiphHandler(),
     ".wav": WAVHandler(),
-    ".wv": XiphHandler(),
+    ".wma": ASFHandler(),
 }
 
 def get_handler(file_path: str) -> RatingHandler | None:
