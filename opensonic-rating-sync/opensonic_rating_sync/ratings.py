@@ -145,7 +145,8 @@ class XiphHandler(RatingHandler):
                 starred = 0
                 rating_raw = audio.get("RATING")
                 if rating_raw:
-                    xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+                    # ИСПРАВЛЕНО: Добавлено str() для совместимости с APETextValue
+                    xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
                     if xiph_rating == 0: rating = None
                     else: rating = max(1, min(10, round(xiph_rating / 10)))
                 if _LIKE_TAG_TEXT in audio:
