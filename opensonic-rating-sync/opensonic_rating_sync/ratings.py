@@ -266,7 +266,6 @@ class ASFHandler(RatingHandler):
                 rating = None
                 starred = 0
                 
-                # ФАКТ ИЗ ИСХОДНИКОВ mutagen 1.48.1: audio.get(key) проксируется в self.tags.get(key)
                 rating_raw = audio.get(self._RATE_TAG)
                 if rating_raw:
                     try:
@@ -282,7 +281,7 @@ class ASFHandler(RatingHandler):
                             rating = max(1, min(10, round(wma_rating / 10)))
                         if rating == 0: rating = None
                     except Exception as e:
-                        # БОЛЬШЕ НИКАКИХ СКРЫТЫХ ОШИБОК! Пишем в лог точную причину.
+                        # Пишем в лог точную причину.
                         logger.error(f"ASF read rating err ({file_path}): {e}")
                         rating = None
                 
@@ -323,8 +322,6 @@ class ASFHandler(RatingHandler):
         except Exception as e: 
             logger.error(f"ASF write tags err ({file_path}): {e}")
             raise
-
-    def _load(self, file_path): return ASF(file_path)
 
     def _load(self, file_path): return ASF(file_path)
 
