@@ -259,46 +259,47 @@ class MP4Handler(RatingHandler):
 class ASFHandler(RatingHandler):
     _RATE_TAG = "WM/SharedUserRating"
     
-    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
             if audio:
                 rating = None
                 starred = 0
-                if audio.tags:
-                    rating_raw = audio.get(self._RATE_TAG)
-                    if rating_raw:
-                        try:
-                            raw_val = rating_raw[0].value
-                            # ИСПРАВЛЕНИЕ: Mutagen может вернуть байты (b"99") вместо int. Обрабатываем это!
-                            if isinstance(raw_val, bytes):
-                                wma_rating_str = raw_val.decode('utf-8', errors='ignore').strip()
-                            else:
-                                wma_rating_str = str(raw_val).strip()
-                            wma_rating = int(wma_rating_str)
-                            
-                            rating = _WMA_RATING_READ_MAP.get(wma_rating)
-                            if rating is None: 
-                                rating = max(1, min(10, round(wma_rating / 10)))
-                            if rating == 0: rating = None
-                        except Exception:
-                            rating = None
-                    
-                    if _LIKE_TAG_ASF in audio:
-                        # ЖЕЛЕЗОБЕТОННОЕ ЧТЕНИЕ: Защита от пробелов, регистра и ТИПА ДАННЫХ
-                        try:
-                            raw_val = audio[_LIKE_TAG_ASF][0].value
-                            # ИСПРАВЛЕНИЕ: Если Mutagen вернул байты (b"L"), декодируем их
-                            if isinstance(raw_val, bytes):
-                                val_str = raw_val.decode('utf-8', errors='ignore').strip().upper()
-                            else:
-                                val_str = str(raw_val).strip().upper()
-                            starred = 1 if val_str == _LIKE_VALUE_ON else 0
-                        except Exception:
-                            starred = 0
+                
+                # ФАКТ ИЗ ИСХОДНИКОВ mutagen 1.48.1: audio.get(key) проксируется в self.tags.get(key)
+                rating_raw = audio.get(self._RATE_TAG)
+                if rating_raw:
+                    try:
+                        raw_val = rating_raw[0].value
+                        # Защита от байтов
+                        if isinstance(raw_val, bytes):
+                            wma_rating = int(raw_val.decode('utf-8', errors='ignore').strip())
+                        else:
+                            wma_rating = int(str(raw_val).strip())
+                        
+                        rating = _WMA_RATING_READ_MAP.get(wma_rating)
+                        if rating is None: 
+                            rating = max(1, min(10, round(wma_rating / 10)))
+                        if rating == 0: rating = None
+                    except Exception as e:
+                        # БОЛЬШЕ НИКАКИХ СКРЫТЫХ ОШИБОК! Пишем в лог точную причину.
+                        logger.error(f"ASF read rating err ({file_path}): {e}")
+                        rating = None
+                
+                if _LIKE_TAG_ASF in audio:
+                    try:
+                        raw_val = audio[_LIKE_TAG_ASF][0].value
+                        if isinstance(raw_val, bytes):
+                            val_str = raw_val.decode('utf-8', errors='ignore').strip().upper()
+                        else:
+                            val_str = str(raw_val).strip().upper()
+                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
+                    except Exception as e:
+                        logger.error(f"ASF read like err ({file_path}): {e}")
+                        starred = 0
                 return rating, starred
-        except Exception as e: logger.error(f"ASF read all err ({file_path}): {e}")
+        except Exception as e: 
+            logger.error(f"ASF read all err ({file_path}): {e}")
         return None, 0
     
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
@@ -306,26 +307,24 @@ class ASFHandler(RatingHandler):
             audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
             
-            # --- Условие 1: Если передан рейтинг ---
             if rating is not None:
+                # ФАКТ ИЗ ИСХОДНИКОВ: del audio[key] проксируется в del self.tags[key]
                 if self._RATE_TAG in audio:
                     del audio[self._RATE_TAG]
                 if rating > 0:
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
-                    # ДОКУМЕНТАЦИЯ MUTAGEN v1.48.1: Значение должно быть обернуто в список [ASFDWordAttribute()]
                     audio[self._RATE_TAG] = [ASFDWordAttribute(wma_rating)] 
                 
-            # --- Условие 2: Если передан лайк ---
             if starred is not None:
                 value = _LIKE_VALUE_ON if starred else "0"
-                # ДОКУМЕНТАЦИЯ MUTAGEN v1.48.1: Строки должны быть обернуты в [ASFUnicodeAttribute()]
                 audio[_LIKE_TAG_ASF] = [ASFUnicodeAttribute(value)]
 
-            # --- Единая атомарная запись ---
             self._safe_save(audio, file_path)
         except Exception as e: 
             logger.error(f"ASF write tags err ({file_path}): {e}")
             raise
+
+    def _load(self, file_path): return ASF(file_path)
 
     def _load(self, file_path): return ASF(file_path)
 
