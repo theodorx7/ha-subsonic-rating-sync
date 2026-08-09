@@ -240,11 +240,13 @@ class SyncAgent:
                 final_f_rate_mtime, final_s_rate_mtime = new_f_rate_mtime, new_s_rate_mtime
 
         # 2. ЛАЙК
-        db_srv_star = db_state['server_starred']
-        db_f_star = db_state['file_starred']
+        # ИСПРАВЛЕНИЕ: Нормализуем None в 0, чтобы алгоритм LWW корректно отслеживал изменения для новых/перепривязанных треков
+        db_srv_star = db_state['server_starred'] or 0
+        db_f_star = db_state['file_starred'] or 0
         
-        srv_star_changed = (srv_starred != db_srv_star) if db_srv_star is not None else False
-        f_star_changed = (f_starred != db_f_star) if db_f_star is not None else False
+        # Теперь простое сравнение, как в рейтинге
+        srv_star_changed = (srv_starred != db_srv_star)
+        f_star_changed = (f_starred != db_f_star)
         
         new_f_star_mtime = now_time if f_star_changed else (db_state['file_starred_mtime'] or 0)
         new_s_star_mtime = now_time if srv_star_changed else (db_state['server_starred_mtime'] or 0)
