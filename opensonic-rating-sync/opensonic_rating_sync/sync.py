@@ -53,7 +53,7 @@ class SyncAgent:
         logger.info(f"Начало цикла синхронизации (режим: {self.sync_mode})...")
         
         starred_ids = self._fetch_starred_ids()
-        logger.info(f"Найдено избранных (starred) треков на сервере: {len(starred_ids)}")
+        logger.info(f"Найдено избранных (starred/liked) треков на сервере: {len(starred_ids)}")
         
         server_songs = self._fetch_all_server_songs()
         logger.info(f"Найдено треков на сервере: {len(server_songs)}")
@@ -74,8 +74,8 @@ class SyncAgent:
 
         logger.info("Цикл синхронизации завершен:")
         logger.info(f"      Обновлено файлов на ДИСКЕ: {disk_updates}")
-        logger.info(f"      Обновлено файлов на СЕРВЕРЕ: {server_updates}")
-        logger.info(f"      Время выполнения цикла: {formatted_time}")
+        logger.info(f"      Обновлено элементов на СЕРВЕРЕ: {server_updates}")
+        logger.info(f"      Время выполнения: {formatted_time}")
 
     def _fetch_starred_ids(self):
         starred_ids = set()
