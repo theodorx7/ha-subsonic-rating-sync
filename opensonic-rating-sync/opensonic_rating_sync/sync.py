@@ -96,9 +96,9 @@ class SyncAgent:
     def _get_action_str(self, w_star, w_rate, star_val, rate_val):
         parts = []
         if w_star:
-            parts.append("❤️" if star_val == 1 else "❌(Лайк)")
+            parts.append("❤️" if star_val == 1 else "❌🤍")
         if w_rate:
-            parts.append("⭐" * rate_val if rate_val > 0 else "❌(Рейтинг)")
+            parts.append("⭐" * rate_val if rate_val > 0 else "❌⭐️")
         if not parts: return "FALSE"
         return "+".join(parts)
 
