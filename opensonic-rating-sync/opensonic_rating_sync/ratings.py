@@ -18,7 +18,7 @@ _KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email"]
 _RATING_EMAIL = "no@email"
 # --- Теги лайка в формате MusicBee (бинарный like: "L"=love, "0"=нет лайка) ---
 _LIKE_TAG_ID3  = "LOVE RATING"                            # TXXX:LOVE RATING (MP3/AIFF)
-_LIKE_TAG_XIPH = "LOVE RATING"                            # Vorbis Comment (FLAC/OGG/OPUS)
+_LIKE_TAG_TEXT = "LOVE RATING"                            # Vorbis Comment (FLAC/OGG/OPUS)
 _LIKE_TAG_MP4  = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
 _LIKE_VALUE_ON = "L"                                      # MusicBee пишет "L" для Love
 
@@ -144,8 +144,8 @@ class XiphHandler(RatingHandler):
                     xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
                     if xiph_rating == 0: rating = None
                     else: rating = max(1, min(10, round(xiph_rating / 10)))
-                if _LIKE_TAG_XIPH in audio:
-                    starred = 1 if str(audio[_LIKE_TAG_XIPH][0]) == _LIKE_VALUE_ON else 0
+                if _LIKE_TAG_TEXT in audio:
+                    starred = 1 if str(audio[_LIKE_TAG_TEXT][0]) == _LIKE_VALUE_ON else 0
                 return rating, starred
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
@@ -163,7 +163,7 @@ class XiphHandler(RatingHandler):
                 
                 # --- Условие 2: Если передан лайк ---
                 if starred is not None:
-                    audio[_LIKE_TAG_XIPH] = _LIKE_VALUE_ON if starred else "0"
+                    audio[_LIKE_TAG_TEXT] = _LIKE_VALUE_ON if starred else "0"
 
                 # --- Единая атомарная запись ---
                 self._safe_save(audio, file_path)
@@ -222,6 +222,7 @@ HANDLER_REGISTRY = {
     ".mp3": MP3Handler(), ".aif": AIFFHandler(), ".aiff": AIFFHandler(),
     ".flac": XiphHandler(), ".ogg": XiphHandler(), ".opus": XiphHandler(),
     ".m4a": MP4Handler(),
+    ".ape": XiphHandler(),
 }
 
 def get_handler(file_path: str) -> RatingHandler | None:
