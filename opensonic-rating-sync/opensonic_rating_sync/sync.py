@@ -60,7 +60,7 @@ class SyncAgent:
         
         for song in server_songs:
             try:
-                u_file, u_server = self._process_song(song, starred_ids)
+                u_file, u_server = self._process_song(song)
                 if u_file: disk_updates += 1
                 if u_server: server_updates += 1
             except Exception as e:
