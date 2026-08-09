@@ -8,7 +8,7 @@ from mutagen.id3 import ID3, POPM, TXXX
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
 from mutagen.wave import WAVE
-from mutagen.asf import ASF, ASFDWordAttribute
+from mutagen.asf import ASF, ASFDWordAttribute, ASFUnicodeAttribute
 
 logger = logging.getLogger(__name__)
 
@@ -312,12 +312,14 @@ class ASFHandler(RatingHandler):
                     del audio.tags[self._RATE_TAG]
                 if rating > 0:
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
-                    audio[self._RATE_TAG] = [wma_rating]
+                    # ДОКУМЕНТАЦИЯ MUTAGEN v1.48.1: Значение должно быть обернуто в список [ASFDWordAttribute()]
+                    audio[self._RATE_TAG] = [ASFDWordAttribute(wma_rating)] 
                 
             # --- Условие 2: Если передан лайк ---
             if starred is not None:
                 value = _LIKE_VALUE_ON if starred else "0"
-                audio[_LIKE_TAG_ASF] = [value]
+                # ДОКУМЕНТАЦИЯ MUTAGEN v1.48.1: Строки должны быть обернуты в [ASFUnicodeAttribute()]
+                audio[_LIKE_TAG_ASF] = [ASFUnicodeAttribute(value)]
 
             # --- Единая атомарная запись ---
             self._safe_save(audio, file_path)
