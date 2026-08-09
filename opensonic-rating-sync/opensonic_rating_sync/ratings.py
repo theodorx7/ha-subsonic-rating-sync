@@ -88,8 +88,19 @@ class ID3Handler(RatingHandler):
                     if nav_popm: rating = _popm_rating_to_internal(nav_popm.rating, _RATING_EMAIL)
                     else: rating = _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
                 
-                like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG_ID3}")
-                if like_frames: starred = 1 if str(like_frames[0].text[0]) == _LIKE_VALUE_ON else 0
+                # ИСПРАВЛЕНИЕ: Железобетонное чтение TXXX лайков для AIFF/MP3
+                # Ищем по всем TXXX фреймам, игнорируя регистр описания и лишние пробелы
+                for frame in audio.tags.getall("TXXX"):
+                    if frame.desc and frame.desc.strip().upper() == _LIKE_TAG_ID3.upper():
+                        try:
+                            val_str = str(frame.text[0]).strip().upper()
+                            if val_str == _LIKE_VALUE_ON:
+                                starred = 1
+                            else:
+                                starred = 0
+                            break # Нашли наш фрейм, выходим из цикла
+                        except Exception:
+                            pass
                 
                 return rating, starred
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
