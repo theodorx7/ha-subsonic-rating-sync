@@ -51,10 +51,7 @@ class SyncAgent:
     def run_sync(self):
         start_time = time.time()
         logger.info(f"Начало цикла синхронизации (режим: {self.sync_mode})...")
-        
-        starred_ids = self._fetch_starred_ids()
-        logger.info(f"Найдено избранных (starred/liked) треков на сервере: {len(starred_ids)}")
-        
+
         server_songs = self._fetch_all_server_songs()
         logger.info(f"Найдено треков на сервере: {len(server_songs)}")
         
@@ -76,17 +73,6 @@ class SyncAgent:
         logger.info(f"      Обновлено файлов на ДИСКЕ: {disk_updates}")
         logger.info(f"      Обновлено элементов на СЕРВЕРЕ: {server_updates}")
         logger.info(f"      Время выполнения: {formatted_time}")
-
-    def _fetch_starred_ids(self):
-        starred_ids = set()
-        try:
-            mf_id = self.config.get('music_folder_id') or None
-            result = self.conn.get_starred2(music_folder_id=mf_id) if mf_id else self.conn.get_starred2()
-            if result and result.song:
-                for s in result.song: starred_ids.add(s.id)
-        except Exception as e:
-            logger.error(f"Ошибка при получении избранных треков (get_starred2): {e}", exc_info=True)
-        return starred_ids
 
     def _fetch_all_server_songs(self):
         songs = []
@@ -146,9 +132,10 @@ class SyncAgent:
         if f_mtime > srv_mtime: return 'file', f_mtime
         if srv_mtime > f_mtime: return 'server', srv_mtime
         return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
-    
-    def _process_song(self, song, starred_ids):
-        srv_starred = 1 if song.id in starred_ids else 0
+
+    def _process_song(self, song):
+        # Читаем лайк напрямую из ответа search3 (как и рейтинг), без отдельного списка
+        srv_starred = 1 if getattr(song, 'starred', None) else 0
         # ИСПРАВЛЕНИЕ: Жестко приводим к int, чтобы избежать TypeError при делении
         srv_rating = int(getattr(song, 'userRating', 0) or getattr(song, 'user_rating', 0) or 0)
     
