@@ -25,7 +25,7 @@ options:
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
   sync_interval_minutes: "1500"
-  dry_run: true
+  dry_run: false
   debug: true
 schema:
   server_protocol: list(https|http)
