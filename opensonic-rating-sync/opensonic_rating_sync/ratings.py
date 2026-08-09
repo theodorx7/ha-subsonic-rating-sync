@@ -7,6 +7,7 @@ from mutagen.aiff import AIFF
 from mutagen.id3 import ID3, POPM, TXXX
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
+from mutagen.wave import WAVE
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,9 @@ class MP3Handler(ID3Handler):
 class AIFFHandler(ID3Handler):
     def _load(self, file_path): return AIFF(file_path)
 
+class WAVHandler(ID3Handler):
+    def _load(self, file_path): return WAVE(file_path)
+
 # --- СТРАТЕГИЯ XIPH (FLAC, OGG, OPUS, APE) ---
 class XiphHandler(RatingHandler):
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
@@ -226,6 +230,8 @@ HANDLER_REGISTRY = {
     ".flac": XiphHandler(), ".ogg": XiphHandler(), ".opus": XiphHandler(),
     ".m4a": MP4Handler(),
     ".ape": XiphHandler(),
+    ".wav": WAVHandler(),
+    ".wv": XiphHandler(),
 }
 
 def get_handler(file_path: str) -> RatingHandler | None:
