@@ -269,19 +269,31 @@ class ASFHandler(RatingHandler):
                 if audio.tags:
                     rating_raw = audio.tags.get(self._RATE_TAG)
                     if rating_raw:
-                        # ИСПРАВЛЕНО: В Mutagen атрибуты ASF возвращаются как объекты.
-                        # Свойство .value содержит нативный python-тип (int).
-                        wma_rating = int(rating_raw[0].value)
-                        rating = _WMA_RATING_READ_MAP.get(wma_rating)
-                        if rating is None: 
-                            rating = max(1, min(10, round(wma_rating / 10)))
-                        if rating == 0: rating = None
+                        try:
+                            raw_val = rating_raw[0].value
+                            # ИСПРАВЛЕНИЕ: Mutagen может вернуть байты (b"99") вместо int. Обрабатываем это!
+                            if isinstance(raw_val, bytes):
+                                wma_rating_str = raw_val.decode('utf-8', errors='ignore').strip()
+                            else:
+                                wma_rating_str = str(raw_val).strip()
+                            wma_rating = int(wma_rating_str)
+                            
+                            rating = _WMA_RATING_READ_MAP.get(wma_rating)
+                            if rating is None: 
+                                rating = max(1, min(10, round(wma_rating / 10)))
+                            if rating == 0: rating = None
+                        except Exception:
+                            rating = None
                     
                     if _LIKE_TAG_ASF in audio.tags:
-                        # ЖЕЛЕЗОБЕТОННОЕ ЧТЕНИЕ: Защита от пробелов и регистра
+                        # ЖЕЛЕЗОБЕТОННОЕ ЧТЕНИЕ: Защита от пробелов, регистра и ТИПА ДАННЫХ
                         try:
-                            # ИСПРАВЛЕНО: Получаем значение через .value
-                            val_str = str(audio[_LIKE_TAG_ASF][0].value).strip().upper()
+                            raw_val = audio[_LIKE_TAG_ASF][0].value
+                            # ИСПРАВЛЕНИЕ: Если Mutagen вернул байты (b"L"), декодируем их
+                            if isinstance(raw_val, bytes):
+                                val_str = raw_val.decode('utf-8', errors='ignore').strip().upper()
+                            else:
+                                val_str = str(raw_val).strip().upper()
                             starred = 1 if val_str == _LIKE_VALUE_ON else 0
                         except Exception:
                             starred = 0
@@ -300,14 +312,11 @@ class ASFHandler(RatingHandler):
                     del audio.tags[self._RATE_TAG]
                 if rating > 0:
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
-                    # ИСПРАВЛЕНО: КРИТИЧЕСКИ ВАЖНО! WMA требует тип DWORD.
-                    # Иначе Mutagen запишет QWORD, и плееры не увидят рейтинг.
-                    audio[self._RATE_TAG] = ASFDWordAttribute(wma_rating) 
+                    audio[self._RATE_TAG] = [wma_rating]
                 
             # --- Условие 2: Если передан лайк ---
             if starred is not None:
                 value = _LIKE_VALUE_ON if starred else "0"
-                # Строки Mutagen автоматически обернет в ASFUnicodeAttribute
                 audio[_LIKE_TAG_ASF] = [value]
 
             # --- Единая атомарная запись ---
