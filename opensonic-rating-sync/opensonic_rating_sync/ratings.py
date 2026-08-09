@@ -130,7 +130,7 @@ class MP3Handler(ID3Handler):
 class AIFFHandler(ID3Handler):
     def _load(self, file_path): return AIFF(file_path)
 
-# --- СТРАТЕГИЯ XIPH (FLAC, OGG, OPUS) ---
+# --- СТРАТЕГИЯ XIPH (FLAC, OGG, OPUS, APE) ---
 class XiphHandler(RatingHandler):
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
@@ -154,6 +154,9 @@ class XiphHandler(RatingHandler):
         try:
             audio = self._load(file_path)
             if audio:
+                # ЗАЩИТА: Если файл совсем без тегов, инициализируем пустой словарь
+                if audio.tags is None:
+                    audio.add_tags()
                 # --- Условие 1: Если передан рейтинг ---
                 if rating is not None:
                     if "RATING" in audio:
