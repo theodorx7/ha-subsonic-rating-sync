@@ -165,16 +165,16 @@ class SyncAgent:
             'file_starred_mtime': 0, 'server_starred_mtime': 0
         }
 
-   #     if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
+         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
             # ОПТИМИЗАЦИЯ: Однократное чтение тегов
-   #         f_rating_internal, f_starred = ratings.get_all_ratings_from_file(file_path)
+             f_rating_internal, f_starred = ratings.get_all_ratings_from_file(file_path)
             # ОТЛАДКА: Покажем, что реально прочитали из файла
-   #         logger.debug(f"READ FROM FILE: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred} (mtime changed)")
-   #     else:
-   #         f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
-   #         f_rating_internal = db_state['file_rating']
+             logger.debug(f"READ FROM FILE: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred} (mtime changed)")
+         else:
+             f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
+             f_rating_internal = db_state['file_rating']
             # ОТЛАДКА: Покажем, если скрипт вообще не стал читать файл
-   #         logger.debug(f"READ FROM DB: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred} (mtime NOT changed)")
+             logger.debug(f"READ FROM DB: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred} (mtime NOT changed)")
 
         # ИСПРАВЛЕНИЕ: Нормализуем None в 0 для рейтинга и лайков
         f_rating_internal = f_rating_internal if f_rating_internal is not None else 0
