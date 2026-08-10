@@ -264,7 +264,7 @@ class ASFHandler(RatingHandler):
             audio = self._load(file_path)
             if audio and audio.tags is not None:
                 # ОТЛАДКА: Выведем ВСЕ теги, которые физически присутствуют в WMA-файле!
-                logger.debug(f"WMA ALL TAGS: {list(audio.tags.keys())}")
+                logger.info(f"WMA ALL TAGS: {list(audio.tags.keys())}")
                 rating = None
                 starred = 0
                 
