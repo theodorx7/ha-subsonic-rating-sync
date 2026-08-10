@@ -319,10 +319,10 @@ class SyncAgent:
             if write_server:
                 if w_srv_star:
                     if t_star == 1 and srv_starred == 0: 
-                        self.conn.star(sids=[song.id])
+                        self.conn.star(id=song.id)
                         actual_srv_write = True
                     elif t_star == 0 and srv_starred == 1: 
-                        self.conn.unstar(sids=[song.id])
+                        self.conn.unstar(id=song.id)
                         actual_srv_write = True
                 if w_srv_rate:
                     if t_rate_os != srv_rating: 
