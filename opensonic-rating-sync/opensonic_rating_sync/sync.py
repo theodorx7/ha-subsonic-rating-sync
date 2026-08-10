@@ -22,15 +22,13 @@ class SyncAgent:
         host = host.split('/')[0].split(':')[0]
         base_url = f"{config['server_protocol']}://{host}"
         
-        server_url = f"{base_url}:{config['server_port']}"
-        conn_kwargs = {
-            'url': server_url,
-            'app_name': "Rating Sync Agent",
-            'username': config.get('user'),
-            'password': config.get('password')
-        }
-            
-        self.conn = libopensonic.Connection(**conn_kwargs)
+            self.conn = libopensonic.Connection(
+            base_url,
+            username=config.get('user'),
+            password=config.get('password'),
+            port=config.get('server_port'),
+            appName="Rating Sync Agent"
+        )
         try:
             ok = self.conn.ping()
             if not ok:
