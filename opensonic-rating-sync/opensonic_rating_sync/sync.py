@@ -22,12 +22,12 @@ class SyncAgent:
         host = host.split('/')[0].split(':')[0]
         base_url = f"{config['server_protocol']}://{host}"
         
+        server_url = f"{base_url}:{config['server_port']}"
         conn_kwargs = {
-            'base_url': base_url,
-            'port': config['server_port'],
+            'url': server_url,
             'app_name': "Rating Sync Agent",
-            'username': config.get('user') or None,
-            'password': config.get('password') or None
+            'username': config.get('user'),
+            'password': config.get('password')
         }
             
         self.conn = libopensonic.Connection(**conn_kwargs)
@@ -42,10 +42,10 @@ class SyncAgent:
 
     def _track_label(self, song, file_path=None):
         """Формирует строку вида: Artist - Title | Filename"""
-        artist = getattr(song, 'artist', None) or ""
-        title = getattr(song, 'title', None) or "<без названия>"
+        artist = song.get('artist', "")
+        title = song.get('title') or "<без названия>"
         artist_title = f"{artist} - {title}" if artist else title
-        name = os.path.basename(file_path) if file_path else getattr(song, 'path', None) or "<нет пути>"
+        name = os.path.basename(file_path) if file_path else song.get('path') or "<нет пути>"
         return f"{artist_title} | {name}"
 
     def run_sync(self):
@@ -85,9 +85,11 @@ class SyncAgent:
             count_per_request = 500
             while True:
                 result = self.conn.search3(query="", song_count=count_per_request, song_offset=offset, music_folder_id=mf_id)
-                if not result or not result.song: break
-                songs.extend(result.song)
-                if len(result.song) < count_per_request: break
+                if not result or 'searchResult3' not in result: break
+                fetched_songs = result['searchResult3'].get('song', [])
+                if not fetched_songs: break
+                songs.extend(fetched_songs)
+                if len(fetched_songs) < count_per_request: break
                 offset += count_per_request
         except Exception as e:
             logger.error(f"Ошибка при получении треков (search3): {e}", exc_info=True)
@@ -134,16 +136,18 @@ class SyncAgent:
         return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
 
     def _process_song(self, song):
+        song_id = song.get('id')
         # Читаем лайк напрямую из ответа search3 (как и рейтинг), без отдельного списка
-        srv_starred = 1 if getattr(song, 'starred', None) else 0
+        srv_starred = 1 if song.get('starred') else 0
         # ИСПРАВЛЕНИЕ: Жестко приводим к int, чтобы избежать TypeError при делении
-        srv_rating = int(getattr(song, 'userRating', 0) or getattr(song, 'user_rating', 0) or 0)
+        srv_rating = int(song.get('userRating', 0) or song.get('user_rating', 0) or 0)
     
-        if not getattr(song, 'path', None):
-            logger.warning(f"Трек {song.id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
+        song_path = song.get('path')
+        if not song_path:
+            logger.warning(f"Трек {song_id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
             return False, False
     
-        raw_path = unquote(song.path)
+        raw_path = unquote(song_path)
         if os.path.isabs(raw_path):
             file_path = os.path.normpath(raw_path)
         else:
@@ -158,7 +162,7 @@ class SyncAgent:
             return False, False
 
         current_mtime = os.stat(file_path).st_mtime_ns
-        db_state = get_track_state(song.id) or {
+        db_state = get_track_state(song_id) or {
             'file_mtime_ns': 0, 'file_starred': None, 'file_rating': None,
             'server_starred': None, 'server_rating': None,
             'file_rating_mtime': 0, 'server_rating_mtime': 0,
@@ -221,7 +225,7 @@ class SyncAgent:
                 final_f_rate_mtime = 0
                 final_s_rate_mtime = 0
                 if is_new_file:
-                    logger.info(f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
+                    logger.info(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
             else:
                 t_rate_os = srv_rating
                 t_rate_internal = f_rating_internal or (srv_rating * 2)
@@ -256,7 +260,7 @@ class SyncAgent:
             final_f_star_mtime = 0
             final_s_star_mtime = 0
             if is_new_file:
-                logger.info(f"{prefix}ID {song.id} — ⚠️ КОНФЛИКТ ЛАЙКОВ (Нет данных о времени): Сервер={srv_starred}, Файл={f_starred}. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
+                logger.info(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ ЛАЙКОВ (Нет данных о времени): Сервер={srv_starred}, Файл={f_starred}. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
         else:
             t_star = srv_starred
             w_file_star, w_srv_star = False, False
@@ -282,7 +286,7 @@ class SyncAgent:
                     final_s_rate = t_rate_os
                 
                 upsert_track_state(
-                    song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
+                    song_id=song_id, file_path=file_path, mtime_ns=current_mtime,
                     f_starred=final_f_star, f_rating=final_f_rate,
                     s_starred=final_s_star, s_rating=final_s_rate,
                     f_rate_mtime=final_f_rate_mtime, s_rate_mtime=final_s_rate_mtime,
@@ -295,7 +299,7 @@ class SyncAgent:
         ws_str = self._get_action_str(write_server and w_srv_star, write_server and w_srv_rate, t_star, t_rate_os)
         
         logger.info(
-            f"{prefix}ID {song.id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
+            f"{prefix}ID {song_id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
             f"({self._track_label(song, file_path)})"
         )
         
@@ -320,31 +324,30 @@ class SyncAgent:
             if write_server:
                 if w_srv_star:
                     if t_star == 1 and srv_starred == 0: 
-                        resp = self.conn.star(id=song.id)
+                        resp = self.conn.star(id=song_id)
                         # py-opensonic возвращает dict. Проверяем статус API!
                         if not resp or resp.get('status') != 'ok':
-                            logger.error(f"API star ERR: {resp} (Song: {song.id})")
+                            logger.error(f"API star ERR: {resp} (Song: {song_id})")
                         else:
                             actual_srv_write = True
                     elif t_star == 0 and srv_starred == 1: 
-                        resp = self.conn.unstar(id=song.id)
+                        resp = self.conn.unstar(id=song_id)
                         if not resp or resp.get('status') != 'ok':
-                            logger.error(f"API unstar ERR: {resp} (Song: {song.id})")
+                            logger.error(f"API unstar ERR: {resp} (Song: {song_id})")
                         else:
                             actual_srv_write = True
                 if w_srv_rate:
                     if t_rate_os != srv_rating: 
-                        resp = self.conn.set_rating(song.id, t_rate_os)
+                        resp = self.conn.set_rating(id=song_id, rating=t_rate_os)
                         if not resp or resp.get('status') != 'ok':
-                            logger.error(f"API set_rating ERR: {resp} (Song: {song.id}, Rating: {t_rate_os})")
+                            logger.error(f"API set_rating ERR: {resp} (Song: {song_id}, Rating: {t_rate_os})")
                         else:
                             actual_srv_write = True
         except Exception as e:
-            logger.error(f"Ошибка записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
-            return False, False
+            logger.error(f"Ошибка записи для трека {song_id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
 
         upsert_track_state(
-            song_id=song.id, file_path=file_path, mtime_ns=current_mtime,
+            song_id=song_id, file_path=file_path, mtime_ns=current_mtime,
             f_starred=t_star if write_file else f_starred, 
             f_rating=t_rate_internal if write_file else f_rating_internal,
             s_starred=t_star if write_server else srv_starred, 
