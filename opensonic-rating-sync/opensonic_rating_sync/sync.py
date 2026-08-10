@@ -83,12 +83,9 @@ class SyncAgent:
             count_per_request = 500
             while True:
                 result = self.conn.search3(query="", song_count=count_per_request, song_offset=offset, music_folder_id=mf_id)
-                if not result: 
-                    break
-                # py-opensonic возвращает объект SearchResult3, извлекаем список треков через атрибут
-                fetched_songs = getattr(result, 'song', [])
-                if not fetched_songs: 
-                    break
+                if not result or 'searchResult3' not in result: break
+                fetched_songs = result['searchResult3'].get('song', [])
+                if not fetched_songs: break
                 songs.extend(fetched_songs)
                 if len(fetched_songs) < count_per_request: break
                 offset += count_per_request
