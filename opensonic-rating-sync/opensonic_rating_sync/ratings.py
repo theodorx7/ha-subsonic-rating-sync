@@ -269,7 +269,13 @@ class ASFHandler(RatingHandler):
                 starred = 0
                 
                 # ИСПРАВЛЕНИЕ: Используем .get() напрямую
-                rating_raw = audio.tags.get(self._RATE_TAG)
+                # Ищем тег по точному имени, но игнорируем регистр, чтобы найти любые старые варианты
+                rating_raw = None
+                for tag_name in audio.tags.keys():
+                    if tag_name.lower() == self._RATE_TAG.lower():
+                        rating_raw = audio.tags[tag_name]
+                        break
+                
                 if rating_raw:
                     raw_val = rating_raw[0].value
                     try:
@@ -290,9 +296,15 @@ class ASFHandler(RatingHandler):
                         logger.error(f"ASF CRITICAL PARSE ERR ({file_path}): raw_val='{raw_val}', type={type(raw_val)}, err={e}")
                         rating = None
                 
-                if _LIKE_TAG_ASF in audio.tags:
+                like_raw = None
+                for tag_name in audio.tags.keys():
+                    if tag_name.lower() == _LIKE_TAG_ASF.lower():
+                        like_raw = audio.tags[tag_name]
+                        break
+                        
+                if like_raw:
                     try:
-                        raw_val = audio.tags[_LIKE_TAG_ASF][0].value
+                        raw_val = like_raw[0].value
                         if isinstance(raw_val, bytes):
                             val_str = raw_val.decode('utf-8', errors='ignore').strip().upper()
                         else:
@@ -312,8 +324,15 @@ class ASFHandler(RatingHandler):
                 audio.add_tags()
             
             if rating is not None:
-                if self._RATE_TAG in audio.tags:
-                    del audio.tags[self._RATE_TAG]
+                # Удаляем старый тег (регистронезависимо)
+                key_to_del = None
+                for tag_name in list(audio.tags.keys()):
+                    if tag_name.lower() == self._RATE_TAG:
+                        key_to_del = tag_name
+                        break
+                if key_to_del:
+                    del audio.tags[key_to_del]
+                    
                 if rating > 0:
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
                     # ФАКТ: Документация предписывает присваивать объект атрибута без обертки в список
@@ -321,9 +340,17 @@ class ASFHandler(RatingHandler):
                 
             if starred is not None:
                 value = _LIKE_VALUE_ON if starred else "0"
-                # ФАКТ: Присваиваем объект без списка
+                
+                # Удаляем старый тег (регистронезависимо)
+                key_to_del = None
+                for tag_name in list(audio.tags.keys()):
+                    if tag_name.lower() == _LIKE_TAG_ASF:
+                        key_to_del = tag_name
+                        break
+                if key_to_del:
+                    del audio.tags[key_to_del]
+                    
                 audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
-
             self._safe_save(audio, file_path)
         except Exception as e: 
             logger.error(f"ASF write tags err ({file_path}): {e}")
