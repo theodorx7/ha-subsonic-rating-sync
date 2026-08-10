@@ -323,34 +323,44 @@ class ASFHandler(RatingHandler):
             if audio.tags is None: 
                 audio.add_tags()
             
+            # --- ЛОГИКА РЕЙТИНГА ---
             if rating is not None:
-                # Удаляем старый тег (регистронезависимо)
-                key_to_del = None
-                for tag_name in list(audio.tags.keys()):
-                    if tag_name.lower() == self._RATE_TAG:
-                        key_to_del = tag_name
-                        break
-                if key_to_del:
-                    del audio.tags[key_to_del]
-                    
                 if rating > 0:
+                    # Есть положительный рейтинг.
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
-                    # ФАКТ: Документация предписывает присваивать объект атрибута без обертки в список
-                    audio.tags[self._RATE_TAG] = ASFDWordAttribute(wma_rating)
-                
-            if starred is not None:
-                value = _LIKE_VALUE_ON if starred else "0"
-                
-                # Удаляем старый тег (регистронезависимо)
-                key_to_del = None
-                for tag_name in list(audio.tags.keys()):
-                    if tag_name.lower() == _LIKE_TAG_ASF:
-                        key_to_del = tag_name
-                        break
-                if key_to_del:
-                    del audio.tags[key_to_del]
                     
-                audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
+                    # Ищем ТОЛЬКО стандартный тег (точное совпадение по константе)
+                    if self._RATE_TAG in audio.tags and audio.tags[self._RATE_TAG]:
+                        # Нашли стандартный тег, перезаписываем его значение прямо внутри объекта
+                        audio.tags[self._RATE_TAG][0].value = wma_rating
+                    else:
+                        # Тега нет, создаем по мировому стандарту
+                        audio.tags[self._RATE_TAG] = ASFDWordAttribute(wma_rating)
+                else:
+                    # Рейтинг убрали (0). Ищем ВСЕ варианты независимо от регистра и удаляем
+                    keys_to_del = [k for k in list(audio.tags.keys()) if k.lower() == self._RATE_TAG.lower()]
+                    for k in keys_to_del:
+                        del audio.tags[k]
+                
+            # --- ЛОГИКА ЛАЙКА ---
+            if starred is not None:
+                if starred:
+                    # Лайк поставлен.
+                    value = _LIKE_VALUE_ON
+                    
+                    # Ищем ТОЛЬКО стандартный тег (точное совпадение по константе)
+                    if _LIKE_TAG_ASF in audio.tags and audio.tags[_LIKE_TAG_ASF]:
+                        # Нашли стандартный тег, перезаписываем его значение
+                        audio.tags[_LIKE_TAG_ASF][0].value = value
+                    else:
+                        # Тега нет, создаем по стандарту MusicBee
+                        audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
+                else:
+                    # Лайк убрали. Ищем ВСЕ варианты независимо от регистра и удаляем
+                    keys_to_del = [k for k in list(audio.tags.keys()) if k.lower() == _LIKE_TAG_ASF.lower()]
+                    for k in keys_to_del:
+                        del audio.tags[k]
+
             self._safe_save(audio, file_path)
         except Exception as e: 
             logger.error(f"ASF write tags err ({file_path}): {e}")
