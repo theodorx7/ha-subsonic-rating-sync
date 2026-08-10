@@ -25,6 +25,8 @@ _LIKE_TAG = "LOVE RATING"                            # Универсальны�
 _LIKE_TAG_ASF = "musicbee/LOVE RATING"                  # WMA (ASF) атрибут MusicBee
 _LIKE_TAG_MP4 = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
 _LIKE_VALUE_ON = "L"
+_LIKE_VALUE_OFF = "0"
+_LIKE_VALUE_BAN = "B"
 
 # --- БАЗОВЫЙ КЛАСС СТРАТЕГИИ ---
 class RatingHandler:
@@ -115,7 +117,7 @@ class ID3Handler(RatingHandler):
             if audio is None: return
             if audio.tags is None: audio.tags = ID3()
 
-            # --- Условие 1: Если передан рейтинг ---
+            # --- РЕЙТИНГ ---
             if rating is not None:
                 popm_frames = audio.tags.getall("POPM")
                 if rating == 0:
@@ -128,11 +130,10 @@ class ID3Handler(RatingHandler):
                             frame.count = 0
                     else:
                         audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
-
-            # --- Условие 2: Если передан лайк ---
+            
+            # --- ЛАЙК ---
             if starred is not None:
-                audio.tags.delall(f"TXXX:{_LIKE_TAG}")
-                value = _LIKE_VALUE_ON if starred else "0"
+                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
                 audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG, text=value))
             
             # --- Единая атомарная запись ---
@@ -183,16 +184,17 @@ class XiphHandler(RatingHandler):
                 # ЗАЩИТА: Если файл совсем без тегов, инициализируем пустой словарь
                 if audio.tags is None:
                     audio.add_tags()
-                # --- Условие 1: Если передан рейтинг ---
+
+                # --- РЕЙТИНГ ---
                 if rating is not None:
                     if "RATING" in audio:
                         del audio["RATING"]
                     if rating > 0:
                         audio["RATING"] = str(max(10, min(100, rating * 10)))
                 
-                # --- Условие 2: Если передан лайк ---
+                # --- ЛАЙК ---
                 if starred is not None:
-                    audio[_LIKE_TAG] = _LIKE_VALUE_ON if starred else "0"
+                    audio[_LIKE_TAG] = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
 
                 # --- Единая атомарная запись ---
                 self._safe_save(audio, file_path)
@@ -234,7 +236,7 @@ class MP4Handler(RatingHandler):
             audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
             
-            # --- Условие 1: Если передан рейтинг ---
+            # --- РЕЙТИНГ ---
             if rating is not None:
                 if self._RATE_TAG in audio.tags:
                     del audio.tags[self._RATE_TAG]
@@ -242,9 +244,9 @@ class MP4Handler(RatingHandler):
                     m4a_rating = str(max(10, min(100, rating * 10)))
                     audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
                 
-            # --- Условие 2: Если передан лайк ---
+            # --- ЛАЙК ---
             if starred is not None:
-                value = _LIKE_VALUE_ON if starred else "0"
+                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
                 audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
 
             # --- Единая атомарная запись ---
@@ -321,7 +323,7 @@ class ASFHandler(RatingHandler):
             if audio.tags is None: 
                 audio.add_tags()
             
-            # --- ЛОГИКА РЕЙТИНГА ---
+            # --- РЕЙТИНГ ---
             if rating is not None:
                 if rating > 0:
                     # Есть положительный рейтинг.
@@ -340,24 +342,10 @@ class ASFHandler(RatingHandler):
                     for k in keys_to_del:
                         del audio.tags[k]
                 
-            # --- ЛОГИКА ЛАЙКА ---
+            # --- ЛАЙК ---
             if starred is not None:
-                if starred:
-                    # Лайк поставлен.
-                    value = _LIKE_VALUE_ON
-                    
-                    # Ищем ТОЛЬКО стандартный тег (точное совпадение по константе)
-                    if _LIKE_TAG_ASF in audio.tags and audio.tags[_LIKE_TAG_ASF]:
-                        # Нашли стандартный тег, перезаписываем его значение
-                        audio.tags[_LIKE_TAG_ASF][0].value = value
-                    else:
-                        # Тега нет, создаем по стандарту MusicBee
-                        audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
-                else:
-                    # Лайк убрали. Ищем ВСЕ варианты независимо от регистра и удаляем
-                    keys_to_del = [k for k in list(audio.tags.keys()) if k.lower() == _LIKE_TAG_ASF.lower()]
-                    for k in keys_to_del:
-                        del audio.tags[k]
+                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
 
             self._safe_save(audio, file_path)
         except Exception as e: 
