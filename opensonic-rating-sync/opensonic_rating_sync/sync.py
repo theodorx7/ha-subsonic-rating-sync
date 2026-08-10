@@ -322,21 +322,21 @@ class SyncAgent:
             if write_server:
                 if w_srv_star:
                     if t_star == 1 and srv_starred == 0: 
-                        resp = self.conn.star(rid=song_id)
+                        resp = self.conn.star(id=song_id)
                         # py-opensonic возвращает dict. Проверяем статус API!
                         if not resp or resp.status != 'ok':
                             logger.error(f"API star ERR: {resp} (Song: {song_id})")
                         else:
                             actual_srv_write = True
                     elif t_star == 0 and srv_starred == 1: 
-                        resp = self.conn.unstar(rid=song_id)
+                        resp = self.conn.unstar(id=song_id)
                         if not resp or resp.status != 'ok':
                             logger.error(f"API unstar ERR: {resp} (Song: {song_id})")
                         else:
                             actual_srv_write = True
                 if w_srv_rate:
                     if t_rate_os != srv_rating: 
-                        resp = self.conn.set_rating(rid=song_id, rating=t_rate_os)
+                        resp = self.conn.set_rating(id=song_id, rating=t_rate_os)
                         if not resp or resp.status != 'ok':
                             logger.error(f"API set_rating ERR: {resp} (Song: {song_id}, Rating: {t_rate_os})")
                         else:
@@ -346,10 +346,10 @@ class SyncAgent:
 
         upsert_track_state(
             song_id=song_id, file_path=file_path, mtime_ns=current_mtime,
-            f_starred=t_star if write_file else f_starred, 
-            f_rating=t_rate_internal if write_file else f_rating_internal,
-            s_starred=t_star if write_server else srv_starred, 
-            s_rating=t_rate_os if write_server else srv_rating,
+            f_starred=t_star if actual_file_write else f_starred, 
+            f_rating=t_rate_internal if actual_file_write else f_rating_internal,
+            s_starred=t_star if actual_srv_write else srv_starred, 
+            s_rating=t_rate_os if actual_srv_write else srv_rating,
             f_rate_mtime=final_f_rate_mtime, s_rate_mtime=final_s_rate_mtime,
             f_star_mtime=final_f_star_mtime, s_star_mtime=final_s_star_mtime
         )
