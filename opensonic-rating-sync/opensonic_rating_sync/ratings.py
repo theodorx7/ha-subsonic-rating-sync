@@ -269,10 +269,9 @@ class ASFHandler(RatingHandler):
                 # ИСПРАВЛЕНИЕ: Используем .get() напрямую
                 rating_raw = audio.tags.get(self._RATE_TAG)
                 if rating_raw:
+                    raw_val = rating_raw[0].value
                     try:
-                        # ФАКТ: ASFDWordAttribute.value всегда возвращает int
-                        raw_val = rating_raw[0].value
-                        
+                        # ФАКТ: Строгое преобразование с логированием сбоев
                         if isinstance(raw_val, int):
                             wma_rating = raw_val
                         elif isinstance(raw_val, bytes):
@@ -285,7 +284,8 @@ class ASFHandler(RatingHandler):
                             rating = max(1, min(10, round(wma_rating / 10)))
                         if rating == 0: rating = None
                     except Exception as e:
-                        logger.error(f"ASF parse rating err ({file_path}): {e}")
+                        # ФАКТ: Теперь ошибка не будет тихой. 
+                        logger.error(f"ASF CRITICAL PARSE ERR ({file_path}): raw_val='{raw_val}', type={type(raw_val)}, err={e}")
                         rating = None
                 
                 if _LIKE_TAG_ASF in audio.tags:
