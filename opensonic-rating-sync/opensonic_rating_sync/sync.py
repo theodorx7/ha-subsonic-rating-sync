@@ -27,7 +27,7 @@ class SyncAgent:
             username=config.get('user'),
             password=config.get('password'),
             port=config.get('server_port'),
-            appName="Rating Sync Agent"
+            app_name="Rating Sync Agent"
         )
         try:
             ok = self.conn.ping()
