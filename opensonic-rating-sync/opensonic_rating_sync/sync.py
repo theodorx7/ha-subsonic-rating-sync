@@ -84,7 +84,7 @@ class SyncAgent:
             while True:
                 result = self.conn.search3(query="", song_count=count_per_request, song_offset=offset, music_folder_id=mf_id)
                 if not result: break
-                fetched_songs = result.songs or []
+                fetched_songs = result.song or []
                 if not fetched_songs: break
                 songs.extend(fetched_songs)
                 if len(fetched_songs) < count_per_request: break
