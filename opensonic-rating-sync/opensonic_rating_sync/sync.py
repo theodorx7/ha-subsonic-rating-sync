@@ -323,21 +323,20 @@ class SyncAgent:
                 if w_srv_star:
                     if t_star == 1 and srv_starred == 0: 
                         resp = self.conn.star(song_id)
-                        # py-opensonic возвращает dict. Проверяем статус API!
-                        if not resp or resp.status != 'ok':
+                        if not resp:
                             logger.error(f"API star ERR: {resp} (Song: {song_id})")
                         else:
                             actual_srv_write = True
                     elif t_star == 0 and srv_starred == 1: 
                         resp = self.conn.unstar(song_id)
-                        if not resp or resp.status != 'ok':
+                        if not resp:
                             logger.error(f"API unstar ERR: {resp} (Song: {song_id})")
                         else:
                             actual_srv_write = True
                 if w_srv_rate:
                     if t_rate_os != srv_rating: 
-                        resp = self.conn.set_rating(song_id, rating=t_rate_os)
-                        if not resp or resp.status != 'ok':
+                        resp = self.conn.set_rating(song_id, t_rate_os)
+                        if not resp:
                             logger.error(f"API set_rating ERR: {resp} (Song: {song_id}, Rating: {t_rate_os})")
                         else:
                             actual_srv_write = True
