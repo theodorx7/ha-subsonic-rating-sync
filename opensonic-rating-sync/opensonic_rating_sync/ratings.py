@@ -22,7 +22,7 @@ _KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email"]
 _RATING_EMAIL = "no@email"
 # --- Теги лайка в формате MusicBee (бинарный like: "L"=love, отсутствие тега или значение "0"=нет лайка) ---
 _LIKE_TAG = "LOVE RATING"                            # Универсальный текстовый тег (MP3/AIFF/WAV, FLAC/OGG/OPUS/APE/WV)
-_LIKE_TAG_ASF = "MUSICBEE/LOVE RATING"                   # WMA (ASF) атрибут MusicBee
+_LIKE_TAG_ASF = "musicbee/love rating"                  # WMA (ASF) атрибут MusicBee
 _LIKE_TAG_MP4 = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
 _LIKE_VALUE_ON = "L"
 
@@ -257,7 +257,7 @@ class MP4Handler(RatingHandler):
 
 # --- СТРАТЕГИЯ WMA (Windows Media Audio / ASF) ---
 class ASFHandler(RatingHandler):
-    _RATE_TAG = "WM/SharedUserRating"
+    _RATE_TAG = "wm/shareduserrating" 
     
     def read_all(self, file_path: str):
         try:
