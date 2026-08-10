@@ -262,16 +262,20 @@ class ASFHandler(RatingHandler):
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
-            if audio:
+            if audio and audio.tags is not None:
                 rating = None
                 starred = 0
                 
-                rating_raw = audio.get(self._RATE_TAG)
+                # ИСПРАВЛЕНИЕ: Используем .get() напрямую
+                rating_raw = audio.tags.get(self._RATE_TAG)
                 if rating_raw:
                     try:
+                        # ФАКТ: ASFDWordAttribute.value всегда возвращает int
                         raw_val = rating_raw[0].value
-                        # Защита от байтов
-                        if isinstance(raw_val, bytes):
+                        
+                        if isinstance(raw_val, int):
+                            wma_rating = raw_val
+                        elif isinstance(raw_val, bytes):
                             wma_rating = int(raw_val.decode('utf-8', errors='ignore').strip())
                         else:
                             wma_rating = int(str(raw_val).strip())
@@ -281,20 +285,18 @@ class ASFHandler(RatingHandler):
                             rating = max(1, min(10, round(wma_rating / 10)))
                         if rating == 0: rating = None
                     except Exception as e:
-                        # Пишем в лог точную причину.
-                        logger.error(f"ASF read rating err ({file_path}): {e}")
+                        logger.error(f"ASF parse rating err ({file_path}): {e}")
                         rating = None
                 
-                if _LIKE_TAG_ASF in audio:
+                if _LIKE_TAG_ASF in audio.tags:
                     try:
-                        raw_val = audio[_LIKE_TAG_ASF][0].value
+                        raw_val = audio.tags[_LIKE_TAG_ASF][0].value
                         if isinstance(raw_val, bytes):
                             val_str = raw_val.decode('utf-8', errors='ignore').strip().upper()
                         else:
                             val_str = str(raw_val).strip().upper()
                         starred = 1 if val_str == _LIKE_VALUE_ON else 0
-                    except Exception as e:
-                        logger.error(f"ASF read like err ({file_path}): {e}")
+                    except Exception:
                         starred = 0
                 return rating, starred
         except Exception as e: 
@@ -304,19 +306,21 @@ class ASFHandler(RatingHandler):
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
         try:
             audio = self._load(file_path)
-            if audio.tags is None: audio.add_tags()
+            if audio.tags is None: 
+                audio.add_tags()
             
             if rating is not None:
-                # ФАКТ ИЗ ИСХОДНИКОВ: del audio[key] проксируется в del self.tags[key]
-                if self._RATE_TAG in audio:
-                    del audio[self._RATE_TAG]
+                if self._RATE_TAG in audio.tags:
+                    del audio.tags[self._RATE_TAG]
                 if rating > 0:
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
-                    audio[self._RATE_TAG] = [ASFDWordAttribute(wma_rating)] 
+                    # ФАКТ: Документация предписывает присваивать объект атрибута без обертки в список
+                    audio.tags[self._RATE_TAG] = ASFDWordAttribute(wma_rating)
                 
             if starred is not None:
                 value = _LIKE_VALUE_ON if starred else "0"
-                audio[_LIKE_TAG_ASF] = [ASFUnicodeAttribute(value)]
+                # ФАКТ: Присваиваем объект без списка
+                audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
 
             self._safe_save(audio, file_path)
         except Exception as e: 
