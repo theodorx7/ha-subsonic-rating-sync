@@ -319,15 +319,25 @@ class SyncAgent:
             if write_server:
                 if w_srv_star:
                     if t_star == 1 and srv_starred == 0: 
-                        self.conn.star(id=song.id)
-                        actual_srv_write = True
+                        resp = self.conn.star(id=song.id)
+                        # py-opensonic возвращает dict. Проверяем статус API!
+                        if not resp or resp.get('status') != 'ok':
+                            logger.error(f"API star ERR: {resp} (Song: {song.id})")
+                        else:
+                            actual_srv_write = True
                     elif t_star == 0 and srv_starred == 1: 
-                        self.conn.unstar(id=song.id)
-                        actual_srv_write = True
+                        resp = self.conn.unstar(id=song.id)
+                        if not resp or resp.get('status') != 'ok':
+                            logger.error(f"API unstar ERR: {resp} (Song: {song.id})")
+                        else:
+                            actual_srv_write = True
                 if w_srv_rate:
                     if t_rate_os != srv_rating: 
-                        self.conn.set_rating(song.id, t_rate_os)
-                        actual_srv_write = True
+                        resp = self.conn.set_rating(song.id, t_rate_os)
+                        if not resp or resp.get('status') != 'ok':
+                            logger.error(f"API set_rating ERR: {resp} (Song: {song.id}, Rating: {t_rate_os})")
+                        else:
+                            actual_srv_write = True
         except Exception as e:
             logger.error(f"Ошибка записи для трека {song.id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
             return False, False
