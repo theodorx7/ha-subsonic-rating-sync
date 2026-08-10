@@ -49,7 +49,7 @@ class RatingHandler:
 
             # --- ЗАЩИТА ОТ ПОТЕРИ ПИТАНИЯ ---
             # Принудительно сбрасываем буферы ОС на физический диск
-            with open(tmp_path, 'rb') as f:
+            with open(tmp_path, 'r+b') as f:
                 os.fsync(f.fileno())
 
             # 3. Атомарно заменяем оригинальный файл временным
