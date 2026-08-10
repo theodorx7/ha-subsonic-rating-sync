@@ -5,7 +5,7 @@ def setup_logger():
     """Инициализация корневого логгера для HA Add-on."""
     # Получаем корневой логгер приложения
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     
     # Предотвращаем дублирование хендлеров при перезапуске
     if not logger.handlers:
