@@ -40,10 +40,10 @@ class SyncAgent:
 
     def _track_label(self, song, file_path=None):
         """Формирует строку вида: Artist - Title | Filename"""
-        artist = song.get('artist', "")
-        title = song.get('title') or "<без названия>"
+        artist = song.artist or ""
+        title = song.title or "<без названия>"
         artist_title = f"{artist} - {title}" if artist else title
-        name = os.path.basename(file_path) if file_path else song.get('path') or "<нет пути>"
+        name = os.path.basename(file_path) if file_path else song.path or "<нет пути>"
         return f"{artist_title} | {name}"
 
     def run_sync(self):
@@ -83,8 +83,8 @@ class SyncAgent:
             count_per_request = 500
             while True:
                 result = self.conn.search3(query="", song_count=count_per_request, song_offset=offset, music_folder_id=mf_id)
-                if not result or 'searchResult3' not in result: break
-                fetched_songs = result['searchResult3'].get('song', [])
+                if not result: break
+                fetched_songs = result.songs or []
                 if not fetched_songs: break
                 songs.extend(fetched_songs)
                 if len(fetched_songs) < count_per_request: break
@@ -134,13 +134,13 @@ class SyncAgent:
         return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
 
     def _process_song(self, song):
-        song_id = song.get('id')
+        song_id = song.id
         # Читаем лайк напрямую из ответа search3 (как и рейтинг), без отдельного списка
-        srv_starred = 1 if song.get('starred') else 0
+        srv_starred = 1 if song.starred else 0
         # ИСПРАВЛЕНИЕ: Жестко приводим к int, чтобы избежать TypeError при делении
-        srv_rating = int(song.get('userRating', 0) or song.get('user_rating', 0) or 0)
+        srv_rating = int(song.user_rating or 0)
     
-        song_path = song.get('path')
+        song_path = song.path
         if not song_path:
             logger.warning(f"Трек {song_id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
             return False, False
@@ -324,20 +324,20 @@ class SyncAgent:
                     if t_star == 1 and srv_starred == 0: 
                         resp = self.conn.star(id=song_id)
                         # py-opensonic возвращает dict. Проверяем статус API!
-                        if not resp or resp.get('status') != 'ok':
+                        if not resp or resp.status != 'ok':
                             logger.error(f"API star ERR: {resp} (Song: {song_id})")
                         else:
                             actual_srv_write = True
                     elif t_star == 0 and srv_starred == 1: 
                         resp = self.conn.unstar(id=song_id)
-                        if not resp or resp.get('status') != 'ok':
+                        if not resp or resp.status != 'ok':
                             logger.error(f"API unstar ERR: {resp} (Song: {song_id})")
                         else:
                             actual_srv_write = True
                 if w_srv_rate:
                     if t_rate_os != srv_rating: 
                         resp = self.conn.set_rating(id=song_id, rating=t_rate_os)
-                        if not resp or resp.get('status') != 'ok':
+                        if not resp or resp.status != 'ok':
                             logger.error(f"API set_rating ERR: {resp} (Song: {song_id}, Rating: {t_rate_os})")
                         else:
                             actual_srv_write = True
