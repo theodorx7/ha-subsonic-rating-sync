@@ -344,13 +344,36 @@ class SyncAgent:
         except Exception as e:
             logger.error(f"Ошибка записи для трека {song_id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
 
+        # ВЫЧИСЛЕНИЕ ФАКТИЧЕСКИХ МЕТОК ВРЕМЕНИ
+        # Если мы пытались записать в файл (w_file_rate/star = True), обновляем метку только при успехе (actual_file_write).
+        # Если не пытались (сторона победила) - берем целевую метку (final_...).
+        if w_file_rate:
+            actual_f_rate_mtime = final_f_rate_mtime if actual_file_write else db_state['file_rating_mtime']
+        else:
+            actual_f_rate_mtime = final_f_rate_mtime
+            
+        if w_srv_rate:
+            actual_s_rate_mtime = final_s_rate_mtime if actual_srv_write else db_state['server_rating_mtime']
+        else:
+            actual_s_rate_mtime = final_s_rate_mtime
+
+        if w_file_star:
+            actual_f_star_mtime = final_f_star_mtime if actual_file_write else db_state['file_starred_mtime']
+        else:
+            actual_f_star_mtime = final_f_star_mtime
+            
+        if w_srv_star:
+            actual_s_star_mtime = final_s_star_mtime if actual_srv_write else db_state['server_starred_mtime']
+        else:
+            actual_s_star_mtime = final_s_star_mtime
+
         upsert_track_state(
             song_id=song_id, file_path=file_path, mtime_ns=current_mtime,
             f_starred=t_star if actual_file_write else f_starred, 
             f_rating=t_rate_internal if actual_file_write else f_rating_internal,
             s_starred=t_star if actual_srv_write else srv_starred, 
             s_rating=t_rate_os if actual_srv_write else srv_rating,
-            f_rate_mtime=final_f_rate_mtime, s_rate_mtime=final_s_rate_mtime,
-            f_star_mtime=final_f_star_mtime, s_star_mtime=final_s_star_mtime
+            f_rate_mtime=actual_f_rate_mtime, s_rate_mtime=actual_s_rate_mtime,
+            f_star_mtime=actual_f_star_mtime, s_star_mtime=actual_s_star_mtime
         )
         return actual_file_write, actual_srv_write
