@@ -22,7 +22,7 @@ class SyncAgent:
         host = host.split('/')[0].split(':')[0]
         base_url = f"{config['server_protocol']}://{host}"
         
-            self.conn = libopensonic.Connection(
+        self.conn = libopensonic.Connection(
             base_url,
             username=config.get('user'),
             password=config.get('password'),
