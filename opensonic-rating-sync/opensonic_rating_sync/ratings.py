@@ -357,10 +357,8 @@ class ASFHandler(RatingHandler):
 # --- РЕЕСТР И ФАСАД ---
 HANDLER_REGISTRY = {
     ".flac": XiphHandler(), ".ogg": XiphHandler(), ".opus": XiphHandler(), ".ape": XiphHandler(), ".wv": XiphHandler(),
-    ".aif": AIFFHandler(), ".aiff": AIFFHandler(),
-    ".mp3": MP3Handler(),
+    ".mp3": MP3Handler(), ".aif": AIFFHandler(), ".aiff": AIFFHandler(), ".wav": WAVHandler(),
     ".m4a": MP4Handler(),
-    ".wav": WAVHandler(),
     ".wma": ASFHandler(),
 }
 
