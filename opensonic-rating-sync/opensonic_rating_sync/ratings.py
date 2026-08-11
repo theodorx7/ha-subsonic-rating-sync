@@ -30,36 +30,48 @@ _LIKE_VALUE_BAN = "B"
 # --- БАЗОВЫЙ КЛАСС СТРАТЕГИИ ---
 class RatingHandler:
     def read_all(self, file_path: str): raise NotImplementedError
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None: raise NotImplementedError
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None: raise NotImplementedError
     def _load(self, file_path: str): raise NotImplementedError
 
-    def _safe_save(self, audio, file_path: str):
-        """Атомарная запись файла для 100% защиты от бинарной порчи."""
-        dir_name = os.path.dirname(file_path)
-        # Создаем временный файл в той же директории
-        fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix=".ha_sync_tmp_")
-        try:
-            os.close(fd)
-            # 1. Копируем оригинальный файл целиком во временный (чтобы перенести аудиоданные!)
-            # Используем copy (без '2'), чтобы избежать ошибок доступа на сетевых дисках (SMB/NFS).
-            # Дата изменения файла все равно обновится на актуальную при вызове audio.save() ниже.
-            shutil.copy(file_path, tmp_path)
+    def _safe_save(self, audio, file_path: str, atomic_save: bool = False):
+        if atomic_save:
+            # --- АТОМАРНЫЙ РЕЖИМ (Copy-Save-Replace) ---
+            # 100% защита от бинарной порчи при гонках и сбоях питания (для SMB/сети).
+            dir_name = os.path.dirname(file_path)
+            # Создаем временный файл в той же директории
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix=".ha_sync_tmp_")
+            try:
+                os.close(fd)
+                # 1. Копируем оригинальный файл целиком во временный (чтобы перенести аудиоданные!)
+                # Используем copy (без '2'), чтобы избежать ошибок доступа на сетевых дисках (SMB/NFS).
+                # Дата изменения файла все равно обновится на актуальную при вызове audio.save() ниже.
+                shutil.copy(file_path, tmp_path)
+    
+                # 2. Сохраняем измененные теги во временный файл (mutagen перепишет теги в копии, не трогая аудио)
+                audio.save(tmp_path)
+    
+                # --- ЗАЩИТА ОТ ПОТЕРИ ПИТАНИЯ ---
+                # Принудительно сбрасываем буферы ОС на физический диск
+                with open(tmp_path, 'r+b') as f:
+                    os.fsync(f.fileno())
+    
+                # 3. Атомарно заменяем оригинальный файл временным
+                os.replace(tmp_path, file_path)
+            except Exception:
+                # Если на этапе записи упала ошибка - удаляем мусор
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                raise # Пробрасываем ошибку дальше, чтобы сработал try-except в вызывающем методе
 
-            # 2. Сохраняем измененные теги во временный файл (mutagen перепишет теги в копии, не трогая аудио)
-            audio.save(tmp_path)
-
+        else:
+            # --- ШТАТНЫЙ РЕЖИМ (In-place) ---
+            # Прямая запись тегов в файл.
+            audio.save(file_path)
+            
             # --- ЗАЩИТА ОТ ПОТЕРИ ПИТАНИЯ ---
             # Принудительно сбрасываем буферы ОС на физический диск
-            with open(tmp_path, 'r+b') as f:
+            with open(file_path, 'r+b') as f:
                 os.fsync(f.fileno())
-
-            # 3. Атомарно заменяем оригинальный файл временным
-            os.replace(tmp_path, file_path)
-        except Exception:
-            # Если на этапе записи упала ошибка - удаляем мусор
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            raise # Пробрасываем ошибку дальше, чтобы сработал try-except в вызывающем методе
 
 # --- КОНВЕРСИИ POPM ---
 def _popm_rating_to_internal(popm_rating, email=None):
@@ -110,7 +122,7 @@ class ID3Handler(RatingHandler):
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
         return None, 0
 
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
         try:
             audio = self._load(file_path)
             if audio is None: return
@@ -140,7 +152,7 @@ class ID3Handler(RatingHandler):
                 audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG, text=value))
             
             # --- Единая атомарная запись ---
-            self._safe_save(audio, file_path)
+            self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"ID3 write tags err ({file_path}): {e}")
             raise
@@ -180,7 +192,7 @@ class XiphHandler(RatingHandler):
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
 
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
         try:
             audio = self._load(file_path)
             if audio:
@@ -203,7 +215,7 @@ class XiphHandler(RatingHandler):
                     audio[_LIKE_TAG] = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
 
                 # --- Единая атомарная запись ---
-                self._safe_save(audio, file_path)
+                self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"Xiph write tags err ({file_path}): {e}")
             raise
@@ -237,7 +249,7 @@ class MP4Handler(RatingHandler):
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
     
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
         try:
             audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
@@ -259,7 +271,7 @@ class MP4Handler(RatingHandler):
                 audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
 
             # --- Единая атомарная запись ---
-            self._safe_save(audio, file_path)
+            self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"MP4 write tags err ({file_path}): {e}")
             raise
@@ -326,7 +338,7 @@ class ASFHandler(RatingHandler):
             logger.error(f"ASF read all err ({file_path}): {e}")
         return None, 0
     
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
         try:
             audio = self._load(file_path)
             if audio.tags is None: 
@@ -348,7 +360,7 @@ class ASFHandler(RatingHandler):
                 value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
                 audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
 
-            self._safe_save(audio, file_path)
+            self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"ASF write tags err ({file_path}): {e}")
             raise
@@ -366,9 +378,9 @@ def get_handler(file_path: str) -> RatingHandler | None:
     ext = os.path.splitext(file_path)[1].lower()
     return HANDLER_REGISTRY.get(ext)
 
-def set_tags_to_file(file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+def set_tags_to_file(file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
     handler = get_handler(file_path)
-    if handler: handler.write_tags(file_path, rating, starred)
+    if handler: handler.write_tags(file_path, rating, starred, atomic_save)
 
 def get_all_ratings_from_file(file_path: str):
     handler = get_handler(file_path)
