@@ -32,6 +32,7 @@ def load_config() -> dict:
         "conflict_resolution":  raw.get("conflict_resolution", ""),
         "sync_interval_minutes": int(raw.get("sync_interval_minutes") or 60),
         "dry_run":              bool(raw.get("dry_run", False)),
+        "atomic_save":          bool(raw.get("atomic_save", False)),
         "debug":                bool(raw.get("debug", False)),
     }
 
