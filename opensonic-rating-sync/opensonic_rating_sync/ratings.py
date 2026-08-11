@@ -116,11 +116,11 @@ class ID3Handler(RatingHandler):
                 
                 rating = _popm_rating_to_internal(selected_popm.rating, selected_popm.email)
             
-            # 2. Чтение лайка (TXXX) - прямой запрос, без лишних проверок
+            # 2. Чтение лайка (TXXX) - прямой запрос сырого значения
             like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG}")
             if like_frames:
-                val_str = str(like_frames[0].text[0]).strip().upper()
-                starred = 1 if val_str == _LIKE_VALUE_ON else 0
+                val_raw = like_frames[0].text[0]
+                starred = 1 if val_raw == _LIKE_VALUE_ON else 0
             
             return rating, starred
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
