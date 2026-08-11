@@ -314,7 +314,7 @@ class SyncAgent:
                 # Если лайк изменился, передаем его как bool. None передаем только если лайк не менялся (w_file_star = False).
                 s_val = bool(t_star) if w_file_star else None
                 
-                ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val)
+                ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val, atomic_save=self.config.get("atomic_save", False))
                 actual_file_write = True  # Флаг означает, что файл физически обновлен
                 if actual_file_write:
                     current_mtime = os.stat(file_path).st_mtime_ns
