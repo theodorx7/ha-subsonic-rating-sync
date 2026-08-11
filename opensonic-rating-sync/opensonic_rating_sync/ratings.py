@@ -94,31 +94,38 @@ class ID3Handler(RatingHandler):
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
-            if audio and audio.tags:
-                rating = None
-                starred = 0
+            if not audio or not audio.tags:
+                return None, 0
+            
+            rating = None
+            starred = 0
+            
+            # 1. Чтение рейтинга (POPM)
+            popm_frames = audio.tags.getall("POPM")
+            if popm_frames:
+                selected_popm = None
+                # Ищем по списку приоритетных плееров
+                for email in _KNOWN_PRIMARY_RATING_PLAYERS:
+                    selected_popm = next((f for f in popm_frames if f.email == email), None)
+                    if selected_popm:
+                        break
                 
-                popm_frames = audio.tags.getall("POPM")
-                if popm_frames:
-                    nav_popm = next((f for f in popm_frames if f.email == _RATING_EMAIL), None)
-                    if nav_popm: rating = _popm_rating_to_internal(nav_popm.rating, _RATING_EMAIL)
-                    else: rating = _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
+                # Если ничего из приоритетного не нашли - берем первый попавшийся
+                if not selected_popm:
+                    selected_popm = popm_frames[0]
                 
-                # ИСПРАВЛЕНИЕ: Железобетонное чтение TXXX лайков для AIFF/MP3
-                # Ищем по всем TXXX фреймам, игнорируя регистр описания и лишние пробелы
-                for frame in audio.tags.getall("TXXX"):
-                    if frame.desc and frame.desc.strip().upper() == _LIKE_TAG.upper():
-                        try:
-                            val_str = str(frame.text[0]).strip().upper()
-                            if val_str == _LIKE_VALUE_ON:
-                                starred = 1
-                            else:
-                                starred = 0
-                            break # Нашли наш фрейм, выходим из цикла
-                        except Exception:
-                            pass
-                
-                return rating, starred
+                rating = _popm_rating_to_internal(selected_popm.rating, selected_popm.email)
+            
+            # --- ЛАЙК ---
+            like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG}")
+            if like_frames:
+                try:
+                    val_raw = like_frames[0].text[0]
+                    starred = 1 if val_raw == _LIKE_VALUE_ON else 0
+                except Exception:
+                    starred = 0
+            
+            return rating, starred
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
         return None, 0
 
@@ -172,23 +179,28 @@ class XiphHandler(RatingHandler):
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
-            if audio:
-                rating = None
-                starred = 0
-                rating_raw = audio.get("RATING")
-                if rating_raw:
-                    # ИСПРАВЛЕНО: Добавлено str() для совместимости с APETextValue
-                    xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
-                    if xiph_rating == 0: rating = None
-                    else: rating = max(1, min(10, round(xiph_rating / 10)))
-                if _LIKE_TAG in audio:
-                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для Vorbis Comments / APE
-                    try:
-                        val_str = str(audio[_LIKE_TAG][0]).strip().upper()
-                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
-                    except Exception:
-                        starred = 0
-                return rating, starred
+            if not audio or not audio.tags:
+                return None, 0
+            
+            rating = None
+            starred = 0
+            
+            # 1. Чтение рейтинга
+            rating_raw = audio.get("RATING")
+            if rating_raw:
+                xiph_rating = int(rating_raw[0])
+                if xiph_rating > 0:
+                    rating = max(1, min(10, round(xiph_rating / 10)))
+            
+            # --- ЛАЙК ---
+            like_raw = audio.get(_LIKE_TAG)
+            if like_raw:
+                try:
+                    starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
+                except Exception:
+                    starred = 0
+            
+            return rating, starred
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
 
@@ -224,27 +236,31 @@ class XiphHandler(RatingHandler):
 
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
 class MP4Handler(RatingHandler):
-    _RATE_TAG = "----:com.apple.iTunes:RATE"
-    
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
+            if not audio or not audio.tags:
+                return None, 0
+            
             rating = None
             starred = 0
-            if audio.tags:
-                rating_raw = audio.tags.get(self._RATE_TAG)
-                if rating_raw:
-                    m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-                    if m4a_rating == 0: rating = None
-                    else: rating = max(1, min(10, round(m4a_rating / 10)))
-                if _LIKE_TAG_MP4 in audio.tags:
-                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для M4A атомов
-                    try:
-                        val_str = audio.tags[_LIKE_TAG_MP4][0].decode('utf-8').strip().upper()
-                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
-                    except Exception:
-                        starred = 0
+            
+            # 1. Чтение рейтинга
+            rating_raw = audio.tags.get(self._RATE_TAG)
+            if rating_raw:
+                m4a_rating = int(rating_raw[0])
+                if m4a_rating > 0:
+                    rating = max(1, min(10, round(m4a_rating / 10)))
+            
+            # --- ЛАЙК ---
+            like_raw = audio.tags.get(_LIKE_TAG_MP4)
+            if like_raw:
+                try:
+                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+                except Exception:
+                    starred = 0
+            
             return rating, starred
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
@@ -289,8 +305,8 @@ class ASFHandler(RatingHandler):
             rating = None
             starred = 0
             
-            # --- РЕЙТИНГ ---
-            rating_raw = audio.tags.get("WM/SharedUserRating")
+            # 1. Чтение рейтинга
+            rating_raw = audio.tags.get(self._RATE_TAG)
             if rating_raw:
                 wma_rating = rating_raw[0].value
                 if wma_rating > 0:
