@@ -251,7 +251,7 @@ class MP4Handler(RatingHandler):
             starred = 0
             
             # 1. Чтение рейтинга
-            rating_raw = audio.tags.get(self._RATE_TAG)
+            rating_raw = audio.tags.get("----:com.apple.iTunes:RATE")
             if rating_raw:
                 m4a_rating = int(rating_raw[0])
                 if m4a_rating > 0:
@@ -310,7 +310,7 @@ class ASFHandler(RatingHandler):
             starred = 0
             
             # 1. Чтение рейтинга
-            rating_raw = audio.tags.get(self._RATE_TAG)
+            rating_raw = audio.tags.get("WM/SharedUserRating")
             if rating_raw:
                 wma_rating = rating_raw[0].value
                 if wma_rating > 0:
