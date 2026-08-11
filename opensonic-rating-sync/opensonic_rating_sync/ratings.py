@@ -317,7 +317,6 @@ class ASFHandler(RatingHandler):
                 wma_rating = rating_raw[0].value
                 if wma_rating > 0:
                     rating = _WMA_RATING_READ_MAP.get(wma_rating)
-                    # Если значение не стандартное (нет в карте) - rating останется None
             
             # --- ЛАЙК ---
             like_raw = audio.tags.get(_LIKE_TAG_ASF)
