@@ -18,7 +18,7 @@ HANDLER_REGISTRY = {
     ".m4a": MP4Handler(),
     ".wma": ASFHandler(),
 }
-# --- КОНСТАНТЫ И КАРТЫ POPM ---
+
 _PRIMARY_MP3_RATING_MAP = {0: 0, 1: 13, 2: 1, 3: 54, 4: 64, 5: 118, 6: 128, 7: 186, 8: 196, 9: 242, 10: 255}
 _ALTERNATIVE_MP3_RATING_MAP = {0: 0, 2: 1, 4: 64, 6: 128, 8: 196, 10: 255}
 _PICARD_MP3_RATING_MAP = {0: 0, 2: 51, 4: 102, 6: 153, 8: 204, 10: 255}
