@@ -192,9 +192,11 @@ class XiphHandler(RatingHandler):
             # 1. Чтение рейтинга
             rating_raw = audio.get("RATING")
             if rating_raw:
-                xiph_rating = int(rating_raw[0])
+                # ИСПРАВЛЕНИЕ: str() нужен, чтобы переварить объект APETextValue из APE/WavPack, который int() не умеет читать напрямую и падает с ошибкой.
+                xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
                 if xiph_rating > 0:
-                    rating = max(1, min(10, round(xiph_rating / 10)))
+                    # ИСПРАВЛЕНИЕ: Если рейтинг <= 10 (шкала 0-5 в APE), умножаем на 2. Если > 10 (шкала 0-100 в FLAC), делим на 10. Иначе 5 звезд превратятся в 0.5 звезды.
+                    rating = max(1, min(10, xiph_rating * 2 if xiph_rating <= 10 else round(xiph_rating / 10)))
             
             # --- ЛАЙК ---
             like_raw = audio.get(_LIKE_TAG)
