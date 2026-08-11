@@ -253,9 +253,9 @@ class MP4Handler(RatingHandler):
             starred = 0
             
             # 1. Чтение рейтинга
-            rating_raw = audio.tags.get(b'----:com.apple.iTunes:RATE')
+            rating_raw = audio.tags.get("----:com.apple.iTunes:RATE")
             if rating_raw:
-                m4a_rating = int(rating_raw[0].decode('utf-8'))
+                m4a_rating = int(str(rating_raw[0], 'utf-8'))
                 if m4a_rating > 0:
                     rating = max(1, min(10, round(m4a_rating / 10)))
             
@@ -281,16 +281,16 @@ class MP4Handler(RatingHandler):
                 if rating > 0:
                     m4a_rating = str(max(10, min(100, rating * 10)))
                     # Перезаписывает атом, если он есть, или создает новый
-                    audio[b'----:com.apple.iTunes:RATE'] = [m4a_rating.encode("utf-8")]
+                    audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
                 else:
                     # Рейтинг 0 — удаляем атом, если он существует
                     if b'----:com.apple.iTunes:RATE' in audio.tags:
-                        del audio.tags[b'----:com.apple.iTunes:RATE']
+                        del audio.tags["----:com.apple.iTunes:RATE"]
                 
             # --- ЛАЙК ---
             if starred is not None:
                 value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
-                audio[b'----:com.apple.iTunes:LOVERATING'] = [bytes(value, 'utf-8')]
+                audio["----:com.apple.iTunes:LOVERATING"] = [bytes(value, 'utf-8')]
 
             # --- Единая атомарная запись ---
             self._safe_save(audio, file_path, atomic_save)
