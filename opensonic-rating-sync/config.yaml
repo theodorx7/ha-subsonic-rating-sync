@@ -26,6 +26,7 @@ options:
   conflict_resolution: "server_wins"
   sync_interval_minutes: "1500"
   dry_run: false
+  atomic_save: false
   debug: true
 schema:
   server_protocol: list(https|http)
@@ -39,5 +40,6 @@ schema:
   conflict_resolution: list(server_wins|file_wins)
   sync_interval_minutes: int?
   dry_run: bool
+  atomic_save: bool
   debug: bool
   
