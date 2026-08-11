@@ -197,10 +197,13 @@ class XiphHandler(RatingHandler):
 
                 # --- РЕЙТИНГ ---
                 if rating is not None:
-                    if "RATING" in audio:
-                        del audio["RATING"]
                     if rating > 0:
+                        # Перезаписывает тег, если он есть, или создает новый
                         audio["RATING"] = str(max(10, min(100, rating * 10)))
+                    else:
+                        # Рейтинг 0 — удаляем тег, если он физически существует
+                        if "RATING" in audio:
+                            del audio["RATING"]
                 
                 # --- ЛАЙК ---
                 if starred is not None:
@@ -248,11 +251,14 @@ class MP4Handler(RatingHandler):
             
             # --- РЕЙТИНГ ---
             if rating is not None:
-                if self._RATE_TAG in audio.tags:
-                    del audio.tags[self._RATE_TAG]
                 if rating > 0:
                     m4a_rating = str(max(10, min(100, rating * 10)))
+                    # Перезаписывает атом, если он есть, или создает новый
                     audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
+                else:
+                    # Рейтинг 0 — удаляем атом, если он существует
+                    if self._RATE_TAG in audio.tags:
+                        del audio.tags[self._RATE_TAG]
                 
             # --- ЛАЙК ---
             if starred is not None:
@@ -336,21 +342,13 @@ class ASFHandler(RatingHandler):
             # --- РЕЙТИНГ ---
             if rating is not None:
                 if rating > 0:
-                    # Есть положительный рейтинг.
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
-                    
-                    # Ищем ТОЛЬКО стандартный тег (точное совпадение по константе)
-                    if self._RATE_TAG in audio.tags and audio.tags[self._RATE_TAG]:
-                        # Нашли стандартный тег, перезаписываем его значение прямо внутри объекта
-                        audio.tags[self._RATE_TAG][0].value = wma_rating
-                    else:
-                        # Тега нет, создаем по мировому стандарту
-                        audio.tags[self._RATE_TAG] = ASFDWordAttribute(wma_rating)
+                    # Перезаписывает атрибут, если он есть, или создает новый
+                    audio.tags[self._RATE_TAG] = ASFDWordAttribute(wma_rating)
                 else:
-                    # Рейтинг убрали (0). Ищем ВСЕ варианты независимо от регистра и удаляем
-                    keys_to_del = [k for k in list(audio.tags.keys()) if k.lower() == self._RATE_TAG.lower()]
-                    for k in keys_to_del:
-                        del audio.tags[k]
+                    # Рейтинг 0 — удаляем атрибут по точному ключу, если он существует
+                    if self._RATE_TAG in audio.tags:
+                        del audio.tags[self._RATE_TAG]
                 
             # --- ЛАЙК ---
             if starred is not None:
