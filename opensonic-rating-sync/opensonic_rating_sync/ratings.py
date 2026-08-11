@@ -188,8 +188,7 @@ class XiphHandler(RatingHandler):
             # --- РЕЙТИНГ ---
             rating_raw = audio.get("RATING")
             if rating_raw:
-                # Важно: Vorbis (FLAC/OGG) возвращает список, а APE (APE/WV) - строку.
-                # Если это список - берем первый элемент, если строка - берем ее целиком.
+                # Если это список - берем первый элемент, если строка - берем ее целиком: Vorbis / APE
                 xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
                 if xiph_rating > 0:
                     rating = max(1, min(10, round(xiph_rating / 10)))
