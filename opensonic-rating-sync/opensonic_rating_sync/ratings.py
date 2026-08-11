@@ -119,8 +119,11 @@ class ID3Handler(RatingHandler):
             # 2. Чтение лайка (TXXX) - прямой запрос сырого значения
             like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG}")
             if like_frames:
-                val_raw = like_frames[0].text[0]
-                starred = 1 if val_raw == _LIKE_VALUE_ON else 0
+                try:
+                    val_raw = like_frames[0].text[0]
+                    starred = 1 if val_raw == _LIKE_VALUE_ON else 0
+                except Exception:
+                    starred = 0
             
             return rating, starred
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
@@ -185,14 +188,19 @@ class XiphHandler(RatingHandler):
             # --- РЕЙТИНГ ---
             rating_raw = audio.get("RATING")
             if rating_raw:
-                xiph_rating = int(rating_raw[0])
+                # Важно: Vorbis (FLAC/OGG) возвращает список, а APE (APE/WV) - строку.
+                # Если это список - берем первый элемент, если строка - берем ее целиком.
+                xiph_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
                 if xiph_rating > 0:
                     rating = max(1, min(10, round(xiph_rating / 10)))
             
             # --- ЛАЙК ---
             like_raw = audio.get(_LIKE_TAG)
             if like_raw:
-                starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
+                try:
+                    starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
+                except Exception:
+                    starred = 0
             
             return rating, starred
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
@@ -243,14 +251,17 @@ class MP4Handler(RatingHandler):
             # --- РЕЙТИНГ ---
             rating_raw = audio.tags.get("----:com.apple.iTunes:RATE")
             if rating_raw:
-                m4a_rating = int(rating_raw[0])
+                m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
                 if m4a_rating > 0:
                     rating = max(1, min(10, round(m4a_rating / 10)))
             
             # --- ЛАЙК ---
             like_raw = audio.tags.get(_LIKE_TAG_MP4)
             if like_raw:
-                starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+                try:
+                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+                except Exception:
+                    starred = 0
             
             return rating, starred
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
@@ -307,7 +318,10 @@ class ASFHandler(RatingHandler):
             # --- ЛАЙК ---
             like_raw = audio.tags.get(_LIKE_TAG_ASF)
             if like_raw:
-                starred = 1 if like_raw[0].value == _LIKE_VALUE_ON else 0
+                try:
+                    starred = 1 if like_raw[0].value == _LIKE_VALUE_ON else 0
+                except Exception:
+                    starred = 0
             
             return rating, starred
         except Exception as e: logger.error(f"ASF read all err ({file_path}): {e}")
