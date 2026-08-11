@@ -82,6 +82,10 @@ def _popm_rating_to_internal(popm_rating, email=None):
     for map_to_try in [_ALTERNATIVE_MP3_RATING_MAP, _PICARD_MP3_RATING_MAP]:
         for internal_rating, popm_value in map_to_try.items():
             if popm_rating == popm_value: return internal_rating
+    # Если рейтинг <= 100, это шкала 0-100 (WAV/AIFF из MusicBee)
+    if popm_rating <= 100:
+        return max(1, min(10, round(popm_rating / 10)))
+    # В остальных случаях — стандартная шкала 0-255
     return min(10, max(1, round((popm_rating / 255) * 9 + 1)))
 
 def _internal_rating_to_popm(internal_rating):
