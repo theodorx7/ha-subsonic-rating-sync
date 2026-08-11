@@ -179,28 +179,23 @@ class XiphHandler(RatingHandler):
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
-            if not audio or not audio.tags:
-                return None, 0
-            
-            rating = None
-            starred = 0
-            
-            # --- РЕЙТИНГ ---
-            rating_raw = audio.get("RATING")
-            if rating_raw:
-                xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
-                if xiph_rating > 0:
-                    rating = max(1, min(10, round(xiph_rating / 10)))
-            
-            # --- ЛАЙК ---
-            like_raw = audio.get(_LIKE_TAG)
-            if like_raw:
-                try:
-                    starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
-                except Exception:
-                    starred = 0
-            
-            return rating, starred
+            if audio:
+                rating = None
+                starred = 0
+                rating_raw = audio.get("RATING")
+                if rating_raw:
+                    # ИСПРАВЛЕНО: Добавлено str() для совместимости с APETextValue
+                    xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
+                    if xiph_rating == 0: rating = None
+                    else: rating = max(1, min(10, round(xiph_rating / 10)))
+                if _LIKE_TAG in audio:
+                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для Vorbis Comments / APE
+                    try:
+                        val_str = str(audio[_LIKE_TAG][0]).strip().upper()
+                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
+                    except Exception:
+                        starred = 0
+                return rating, starred
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
 
