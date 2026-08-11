@@ -176,23 +176,25 @@ class XiphHandler(RatingHandler):
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
-            if audio:
-                rating = None
-                starred = 0
-                rating_raw = audio.get("RATING")
-                if rating_raw:
-                    # ИСПРАВЛЕНО: Добавлено str() для совместимости с APETextValue
-                    xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
-                    if xiph_rating == 0: rating = None
-                    else: rating = max(1, min(10, round(xiph_rating / 10)))
-                if _LIKE_TAG in audio:
-                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для Vorbis Comments / APE
-                    try:
-                        val_str = str(audio[_LIKE_TAG][0]).strip().upper()
-                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
-                    except Exception:
-                        starred = 0
-                return rating, starred
+            if not audio or not audio.tags:
+                return None, 0
+            
+            rating = None
+            starred = 0
+            
+            # --- РЕЙТИНГ ---
+            rating_raw = audio.get("RATING")
+            if rating_raw:
+                xiph_rating = int(rating_raw[0])
+                if xiph_rating > 0:
+                    rating = max(1, min(10, round(xiph_rating / 10)))
+            
+            # --- ЛАЙК ---
+            like_raw = audio.get(_LIKE_TAG)
+            if like_raw:
+                starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
+            
+            return rating, starred
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
 
@@ -228,27 +230,28 @@ class XiphHandler(RatingHandler):
 
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
 class MP4Handler(RatingHandler):
-    _RATE_TAG = "----:com.apple.iTunes:RATE"
-    
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
+            if not audio or not audio.tags:
+                return None, 0
+            
             rating = None
             starred = 0
-            if audio.tags:
-                rating_raw = audio.tags.get(self._RATE_TAG)
-                if rating_raw:
-                    m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-                    if m4a_rating == 0: rating = None
-                    else: rating = max(1, min(10, round(m4a_rating / 10)))
-                if _LIKE_TAG_MP4 in audio.tags:
-                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для M4A атомов
-                    try:
-                        val_str = audio.tags[_LIKE_TAG_MP4][0].decode('utf-8').strip().upper()
-                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
-                    except Exception:
-                        starred = 0
+            
+            # --- РЕЙТИНГ ---
+            rating_raw = audio.tags.get("----:com.apple.iTunes:RATE")
+            if rating_raw:
+                m4a_rating = int(rating_raw[0])
+                if m4a_rating > 0:
+                    rating = max(1, min(10, round(m4a_rating / 10)))
+            
+            # --- ЛАЙК ---
+            like_raw = audio.tags.get(_LIKE_TAG_MP4)
+            if like_raw:
+                starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+            
             return rating, starred
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
@@ -263,11 +266,11 @@ class MP4Handler(RatingHandler):
                 if rating > 0:
                     m4a_rating = str(max(10, min(100, rating * 10)))
                     # Перезаписывает атом, если он есть, или создает новый
-                    audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
+                    audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
                 else:
                     # Рейтинг 0 — удаляем атом, если он существует
-                    if self._RATE_TAG in audio.tags:
-                        del audio.tags[self._RATE_TAG]
+                    if "----:com.apple.iTunes:RATE" in audio.tags:
+                        del audio.tags["----:com.apple.iTunes:RATE"]
                 
             # --- ЛАЙК ---
             if starred is not None:
@@ -284,62 +287,30 @@ class MP4Handler(RatingHandler):
 
 # --- СТРАТЕГИЯ WMA (Windows Media Audio / ASF) ---
 class ASFHandler(RatingHandler):
-    _RATE_TAG = "WM/SharedUserRating" 
-    
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
-            if audio and audio.tags is not None:
-                rating = None
-                starred = 0
-                
-                # ИСПРАВЛЕНИЕ: Используем .get() напрямую
-                # Ищем тег по точному имени, но игнорируем регистр, чтобы найти любые старые варианты
-                rating_raw = None
-                for tag_name in audio.tags.keys():
-                    if tag_name.lower() == self._RATE_TAG.lower():
-                        rating_raw = audio.tags[tag_name]
-                        break
-                
-                if rating_raw:
-                    raw_val = rating_raw[0].value
-                    try:
-                        # ФАКТ: Строгое преобразование с логированием сбоев
-                        if isinstance(raw_val, int):
-                            wma_rating = raw_val
-                        elif isinstance(raw_val, bytes):
-                            wma_rating = int(raw_val.decode('utf-8', errors='ignore').strip())
-                        else:
-                            wma_rating = int(str(raw_val).strip())
-                        
-                        rating = _WMA_RATING_READ_MAP.get(wma_rating)
-                        if rating is None: 
-                            rating = max(1, min(10, round(wma_rating / 10)))
-                        if rating == 0: rating = None
-                    except Exception as e:
-                        # ФАКТ: Теперь ошибка не будет тихой. 
-                        logger.error(f"ASF CRITICAL PARSE ERR ({file_path}): raw_val='{raw_val}', type={type(raw_val)}, err={e}")
-                        rating = None
-                
-                like_raw = None
-                for tag_name in audio.tags.keys():
-                    if tag_name.lower() == _LIKE_TAG_ASF.lower():
-                        like_raw = audio.tags[tag_name]
-                        break
-                        
-                if like_raw:
-                    try:
-                        raw_val = like_raw[0].value
-                        if isinstance(raw_val, bytes):
-                            val_str = raw_val.decode('utf-8', errors='ignore').strip().upper()
-                        else:
-                            val_str = str(raw_val).strip().upper()
-                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
-                    except Exception:
-                        starred = 0
-                return rating, starred
-        except Exception as e: 
-            logger.error(f"ASF read all err ({file_path}): {e}")
+            if not audio or not audio.tags:
+                return None, 0
+            
+            rating = None
+            starred = 0
+            
+            # --- РЕЙТИНГ ---
+            rating_raw = audio.tags.get("WM/SharedUserRating")
+            if rating_raw:
+                wma_rating = rating_raw[0].value
+                if wma_rating > 0:
+                    rating = _WMA_RATING_READ_MAP.get(wma_rating)
+                    # Если значение не стандартное (нет в карте) - rating останется None
+            
+            # --- ЛАЙК ---
+            like_raw = audio.tags.get(_LIKE_TAG_ASF)
+            if like_raw:
+                starred = 1 if like_raw[0].value == _LIKE_VALUE_ON else 0
+            
+            return rating, starred
+        except Exception as e: logger.error(f"ASF read all err ({file_path}): {e}")
         return None, 0
     
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
@@ -353,11 +324,11 @@ class ASFHandler(RatingHandler):
                 if rating > 0:
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
                     # Перезаписывает атрибут, если он есть, или создает новый
-                    audio.tags[self._RATE_TAG] = ASFDWordAttribute(wma_rating)
+                    audio.tags["WM/SharedUserRating"] = ASFDWordAttribute(wma_rating)
                 else:
                     # Рейтинг 0 — удаляем атрибут по точному ключу, если он существует
-                    if self._RATE_TAG in audio.tags:
-                        del audio.tags[self._RATE_TAG]
+                    if "WM/SharedUserRating" in audio.tags:
+                        del audio.tags["WM/SharedUserRating"]
                 
             # --- ЛАЙК ---
             if starred is not None:
