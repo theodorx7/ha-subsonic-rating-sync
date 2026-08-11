@@ -125,17 +125,21 @@ class ID3Handler(RatingHandler):
 
             # --- РЕЙТИНГ ---
             if rating is not None:
+                # Конвертируем рейтинг (даже если это 0) в шкалу POPM
+                popm_rating = _internal_rating_to_popm(rating)
+                # Получаем все существующие фреймы POPM за один вызов
                 popm_frames = audio.tags.getall("POPM")
-                if rating == 0:
-                    if popm_frames: audio.tags.delall("POPM")
+                
+                if popm_frames:
+                    # Фреймы есть: обновляем рейтинг в каждом из них
+                    for frame in popm_frames:
+                        frame.rating = popm_rating
+                        # НЕ трогаем frame.count! Если счетчик там был, он сохранится. Если нет — останется отсутствовать.
+                        # Это закладывает фундамент для будущей работы со счетчиком без изменения логики сейчас.
                 else:
-                    popm_rating = _internal_rating_to_popm(rating)
-                    if popm_frames:
-                        for frame in popm_frames:
-                            frame.rating = popm_rating
-                            frame.count = 0
-                    else:
-                        audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating, count=0))
+                    # Фреймов нет: создаем один стандартный с нужным рейтингом
+                    # count не указываем, так как он опционален в спецификации ID3
+                    audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating))
             
             # --- ЛАЙК ---
             if starred is not None:
