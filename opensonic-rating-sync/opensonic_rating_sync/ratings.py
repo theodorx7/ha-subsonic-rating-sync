@@ -251,7 +251,8 @@ class MP4Handler(RatingHandler):
             # --- РЕЙТИНГ ---
             rating_raw = audio.tags.get("----:com.apple.iTunes:RATE")
             if rating_raw:
-                m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+                # int(b'80') в Python 3 вызывает ошибку ValueError. Обязательно декодируем.
+                m4a_rating = int(rating_raw[0].decode('utf-8'))
                 if m4a_rating > 0:
                     rating = max(1, min(10, round(m4a_rating / 10)))
             
