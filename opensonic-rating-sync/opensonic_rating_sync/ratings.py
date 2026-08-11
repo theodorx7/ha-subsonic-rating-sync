@@ -12,6 +12,12 @@ from mutagen.asf import ASF, ASFDWordAttribute, ASFUnicodeAttribute
 
 logger = logging.getLogger(__name__)
 
+HANDLER_REGISTRY = {
+    ".flac": XiphHandler(), ".ogg": XiphHandler(), ".opus": XiphHandler(), ".ape": XiphHandler(), ".wv": XiphHandler(),
+    ".mp3": MP3Handler(), ".aif": AIFFHandler(), ".aiff": AIFFHandler(), ".wav": WAVHandler(),
+    ".m4a": MP4Handler(),
+    ".wma": ASFHandler(),
+}
 # --- КОНСТАНТЫ И КАРТЫ POPM ---
 _PRIMARY_MP3_RATING_MAP = {0: 0, 1: 13, 2: 1, 3: 54, 4: 64, 5: 118, 6: 128, 7: 186, 8: 196, 9: 242, 10: 255}
 _ALTERNATIVE_MP3_RATING_MAP = {0: 0, 2: 1, 4: 64, 6: 128, 8: 196, 10: 255}
@@ -20,10 +26,10 @@ _WMA_RATING_WRITE_MAP = {0: 0, 1: 1, 2: 1, 3: 25, 4: 25, 5: 50, 6: 50, 7: 75, 8:
 _WMA_RATING_READ_MAP = {0: 0, 1: 2, 25: 4, 50: 6, 75: 8, 99: 10}
 _KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email"]
 _RATING_EMAIL = "no@email"
-# --- Теги лайка в формате MusicBee (бинарный like: "L"=love, отсутствие тега или значение "0"=нет лайка) ---
-_LIKE_TAG = "LOVE RATING"                            # Универсальный текстовый тег (MP3/AIFF/WAV, FLAC/OGG/OPUS/APE/WV)
-_LIKE_TAG_ASF = "musicbee/LOVE RATING"                  # WMA (ASF) атрибут MusicBee
-_LIKE_TAG_MP4 = "----:com.apple.iTunes:LOVERATING"      # MPEG-4 atom (M4A)
+# --- Теги лайка в формате MusicBee ---
+_LIKE_TAG = "LOVE RATING"
+_LIKE_TAG_ASF = "musicbee/LOVE RATING"
+_LIKE_TAG_MP4 = "----:com.apple.iTunes:LOVERATING"
 _LIKE_VALUE_ON = "L"
 _LIKE_VALUE_OFF = "0"
 _LIKE_VALUE_BAN = "B"
@@ -353,14 +359,6 @@ class ASFHandler(RatingHandler):
             raise
 
     def _load(self, file_path): return ASF(file_path)
-
-# --- РЕЕСТР И ФАСАД ---
-HANDLER_REGISTRY = {
-    ".flac": XiphHandler(), ".ogg": XiphHandler(), ".opus": XiphHandler(), ".ape": XiphHandler(), ".wv": XiphHandler(),
-    ".mp3": MP3Handler(), ".aif": AIFFHandler(), ".aiff": AIFFHandler(), ".wav": WAVHandler(),
-    ".m4a": MP4Handler(),
-    ".wma": ASFHandler(),
-}
 
 def get_handler(file_path: str) -> RatingHandler | None:
     ext = os.path.splitext(file_path)[1].lower()
