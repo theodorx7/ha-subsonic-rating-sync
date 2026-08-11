@@ -94,31 +94,35 @@ class ID3Handler(RatingHandler):
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
-            if audio and audio.tags:
-                rating = None
-                starred = 0
+            if not audio or not audio.tags:
+                return None, 0
+            
+            rating = None
+            starred = 0
+            
+            # 1. Чтение рейтинга (POPM)
+            popm_frames = audio.tags.getall("POPM")
+            if popm_frames:
+                selected_popm = None
+                # Ищем по списку приоритетных плееров
+                for email in _KNOWN_PRIMARY_RATING_PLAYERS:
+                    selected_popm = next((f for f in popm_frames if f.email == email), None)
+                    if selected_popm:
+                        break
                 
-                popm_frames = audio.tags.getall("POPM")
-                if popm_frames:
-                    nav_popm = next((f for f in popm_frames if f.email == _RATING_EMAIL), None)
-                    if nav_popm: rating = _popm_rating_to_internal(nav_popm.rating, _RATING_EMAIL)
-                    else: rating = _popm_rating_to_internal(popm_frames[0].rating, popm_frames[0].email)
+                # Если ничего из приоритетного не нашли - берем первый попавшийся
+                if not selected_popm:
+                    selected_popm = popm_frames[0]
                 
-                # ИСПРАВЛЕНИЕ: Железобетонное чтение TXXX лайков для AIFF/MP3
-                # Ищем по всем TXXX фреймам, игнорируя регистр описания и лишние пробелы
-                for frame in audio.tags.getall("TXXX"):
-                    if frame.desc and frame.desc.strip().upper() == _LIKE_TAG.upper():
-                        try:
-                            val_str = str(frame.text[0]).strip().upper()
-                            if val_str == _LIKE_VALUE_ON:
-                                starred = 1
-                            else:
-                                starred = 0
-                            break # Нашли наш фрейм, выходим из цикла
-                        except Exception:
-                            pass
-                
-                return rating, starred
+                rating = _popm_rating_to_internal(selected_popm.rating, selected_popm.email)
+            
+            # 2. Чтение лайка (TXXX) - прямой запрос, без лишних проверок
+            like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG}")
+            if like_frames:
+                val_str = str(like_frames[0].text[0]).strip().upper()
+                starred = 1 if val_str == _LIKE_VALUE_ON else 0
+            
+            return rating, starred
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
         return None, 0
 
