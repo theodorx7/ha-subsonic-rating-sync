@@ -385,4 +385,5 @@ class SyncAgent:
             f_rate_mtime=actual_f_rate_mtime, s_rate_mtime=actual_s_rate_mtime,
             f_star_mtime=actual_f_star_mtime, s_star_mtime=actual_s_star_mtime
         )
-        return actual_file_write, actual_srv_write
+        # ИЗМЕНЕНИЕ: Возвращаем объединенный флаг файловой записи и флаг серверной записи
+        return (actual_f_rate_write or actual_f_star_write), actual_srv_write
