@@ -275,7 +275,11 @@ class MP4Handler(RatingHandler):
             starred = 0
             
             # --- ЧТЕНИЕ РЕЙТИНГА ---
-            rating_raw = audio.tags.get("----:com.apple.iTunes:RATE")
+            try:
+                rating_raw = audio.tags["----:com.apple.iTunes:RATE"]
+            except KeyError:
+                rating_raw = None
+                
             if rating_raw:
                 try:
                     rate_val = rating_raw[0] if isinstance(rating_raw, list) else rating_raw
@@ -289,7 +293,11 @@ class MP4Handler(RatingHandler):
                     rating = None
             
             # --- ЧТЕНИЕ ЛАЙКА ---
-            like_raw = audio.tags.get(_LIKE_TAG_MP4)
+            try:
+                like_raw = audio.tags[_LIKE_TAG_MP4]
+            except KeyError:
+                like_raw = None
+
             if like_raw:
                 try:
                     starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
