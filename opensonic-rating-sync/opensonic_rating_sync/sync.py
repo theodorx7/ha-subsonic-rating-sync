@@ -305,7 +305,8 @@ class SyncAgent:
             return write_file, write_server
 
         # Боевой режим
-        actual_file_write = False
+        actual_f_rate_write = False
+        actual_f_star_write = False
         actual_srv_write = False
         try:
             if write_file:
@@ -314,9 +315,15 @@ class SyncAgent:
                 # Если лайк изменился, передаем его как bool. None передаем только если лайк не менялся (w_file_star = False).
                 s_val = bool(t_star) if w_file_star else None
                 
-                ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val, atomic_save=self.config.get("atomic_save", False))
-                actual_file_write = True  # Флаг означает, что файл физически обновлен
-                if actual_file_write:
+                # ИЗМЕНЕНИЕ: Получаем кортеж статусов записи (рейтинг, лайк) от ratings.py
+                r_status, s_status = ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val, atomic_save=self.config.get("atomic_save", False))
+                
+                # ИЗМЕНЕНИЕ: Обновляем раздельные флаги только при успешной записи конкретного поля
+                if r_status: actual_f_rate_write = True
+                if s_status: actual_f_star_write = True
+                    
+                # ИЗМЕНЕНИЕ: Если хотя бы одно поле записано успешно, фиксируем новое время изменения файла
+                if actual_f_rate_write or actual_f_star_write:
                     current_mtime = os.stat(file_path).st_mtime_ns
 
             if write_server:
@@ -347,7 +354,8 @@ class SyncAgent:
         # Если мы пытались записать в файл (w_file_rate/star = True), обновляем метку только при успехе (actual_file_write).
         # Если не пытались (сторона победила) - берем целевую метку (final_...).
         if w_file_rate:
-            actual_f_rate_mtime = final_f_rate_mtime if actual_file_write else db_state['file_rating_mtime']
+            # ИЗМЕНЕНИЕ: Используем раздельный флаг actual_f_rate_write для отката mtime при неудаче
+            actual_f_rate_mtime = final_f_rate_mtime if actual_f_rate_write else db_state['file_rating_mtime']
         else:
             actual_f_rate_mtime = final_f_rate_mtime
             
@@ -357,7 +365,8 @@ class SyncAgent:
             actual_s_rate_mtime = final_s_rate_mtime
 
         if w_file_star:
-            actual_f_star_mtime = final_f_star_mtime if actual_file_write else db_state['file_starred_mtime']
+            # ИЗМЕНЕНИЕ: Используем раздельный флаг actual_f_star_write для отката mtime при неудаче
+            actual_f_star_mtime = final_f_star_mtime if actual_f_star_write else db_state['file_starred_mtime']
         else:
             actual_f_star_mtime = final_f_star_mtime
             
@@ -368,8 +377,9 @@ class SyncAgent:
 
         upsert_track_state(
             song_id=song_id, file_path=file_path, mtime_ns=current_mtime,
-            f_starred=t_star if actual_file_write else f_starred, 
-            f_rating=t_rate_internal if actual_file_write else f_rating_internal,
+            # ИЗМЕНЕНИЕ: Записываем новые значения в БД только если запись на диск была запрошена И успешна (actual_f_rate_write / actual_f_star_write)
+            f_starred=t_star if (w_file_star and actual_f_star_write) else f_starred, 
+            f_rating=t_rate_internal if (w_file_rate and actual_f_rate_write) else f_rating_internal,
             s_starred=t_star if actual_srv_write else srv_starred, 
             s_rating=t_rate_os if actual_srv_write else srv_rating,
             f_rate_mtime=actual_f_rate_mtime, s_rate_mtime=actual_s_rate_mtime,
