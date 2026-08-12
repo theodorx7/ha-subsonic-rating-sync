@@ -281,10 +281,10 @@ class MP4Handler(RatingHandler):
             rating_raw = audio.tags.get("rate")
             if rating_raw:
                 try:
-                    rate_val = rating_raw[0] if isinstance(rating_raw, list) else rating_raw
+                    m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
 #                    if isinstance(rate_val, bytes):
 #                        rate_val = rate_val.decode('utf-8')
-#                        m4a_rating = int(rate_val)
+ #                       m4a_rating = int(rate_val)
                     if m4a_rating > 0:
                         rating = max(1, min(10, round(m4a_rating / 10)))
                 except Exception as e:
