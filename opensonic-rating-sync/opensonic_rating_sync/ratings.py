@@ -279,19 +279,26 @@ class MP4Handler(RatingHandler):
             
             # --- ЧТЕНИЕ РЕЙТИНГА ---
             try:
-                rating_raw = audio.tags["----:com.apple.iTunes:RATE"]
-            except KeyError:
-                rating_raw = None
+                # Читаем то, что реально есть в файле (согласно логу)
+                rating_raw = audio.tags["rate"]
                 
-            if rating_raw:
-                try:
-                    rate_val = rating_raw[0].decode('utf-8')
+                # ДИАГНОСТИКА: Выводим тип и точное представление данных
+                val_to_log = rating_raw[0] if isinstance(rating_raw, list) else rating_raw
+                logger.debug(f"DIAG MP4 'rate' atom: Type={type(val_to_log).__name__}, Value={repr(val_to_log)}")
+                
+                if rating_raw:
+                    rate_val = rating_raw[0] if isinstance(rating_raw, list) else rating_raw
+                    # Mutagen может вернуть байты или сразу int, проверяем
+                    if isinstance(rate_val, bytes):
+                        rate_val = rate_val.decode('utf-8')
                     m4a_rating = int(rate_val)
                     if m4a_rating > 0:
                         rating = max(1, min(10, round(m4a_rating / 10)))
-                except Exception as e:
-                    logger.debug(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
-                    rating = None
+            except KeyError:
+                rating_raw = None
+            except Exception as e:
+                logger.debug(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
+                rating = None
             
             # --- ЧТЕНИЕ ЛАЙКА ---
             try:
