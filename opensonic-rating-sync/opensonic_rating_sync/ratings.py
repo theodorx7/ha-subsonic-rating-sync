@@ -312,7 +312,7 @@ class MP4Handler(RatingHandler):
                         audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
                     else:
                         # Рейтинг 0 — удаляем атом, если он существует
-                        if "rate" in audio.tags:
+                        if "----:com.apple.iTunes:RATE" in audio.tags:
                             del audio.tags["----:com.apple.iTunes:RATE"]
                 except Exception as e:
                     logger.error(f"MP4 rating write prep err ({file_path}): {e}")
