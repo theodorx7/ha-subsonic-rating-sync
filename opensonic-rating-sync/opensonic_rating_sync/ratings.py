@@ -264,68 +264,53 @@ class XiphHandler(RatingHandler):
 
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
 class MP4Handler(RatingHandler):
+    _RATE_TAG = "----:com.apple.iTunes:RATE"
+    
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
-            if not audio or not audio.tags:
-                return None, 0
-            
             rating = None
             starred = 0
-            
-            # --- ЧТЕНИЕ РЕЙТИНГА ---
-            rating_raw = audio.tags.get("rate")
-            if rating_raw:
-                try:
+            if audio.tags:
+                rating_raw = audio.tags.get(self._RATE_TAG)
+                if rating_raw:
                     m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-                    if m4a_rating > 0:
-                        rating = max(1, min(10, round(m4a_rating / 10)))
-                except Exception as e:
-                    logger.debug(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
-                    rating = None
-            
-            # --- ЧТЕНИЕ ЛАЙКА ---
-            like_raw = audio.tags.get(_LIKE_TAG_MP4)
-            if like_raw:
-                try:
-                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
-                except Exception as e:
-                    logger.debug(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
-                    starred = 0
-            
+                    if m4a_rating == 0: rating = None
+                    else: rating = max(1, min(10, round(m4a_rating / 10)))
+                if _LIKE_TAG_MP4 in audio.tags:
+                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для M4A атомов
+                    try:
+                        val_str = audio.tags[_LIKE_TAG_MP4][0].decode('utf-8').strip().upper()
+                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
+                    except Exception:
+                        starred = 0
             return rating, starred
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
     
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
         try:
             audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
             
-            # --- ЗАПИСЬ РЕЙТИНГА M4A ---
+            # --- РЕЙТИНГ ---
             if rating is not None:
-                try:
-                    if rating > 0:
-                        m4a_rating = str(max(10, min(100, rating * 10)))
-                        # Перезаписывает атом, если он есть, или создает новый
-                        audio["rate"] = [m4a_rating.encode("utf-8")]
-                    else:
-                        # Рейтинг 0 — удаляем атом, если он существует
-                        if "rate" in audio.tags:
-                            del audio.tags["rate"]
-                except Exception as e:
-                    logger.error(f"MP4 rating write prep err ({file_path}): {e}")
+                if rating > 0:
+                    m4a_rating = str(max(10, min(100, rating * 10)))
+                    # Перезаписывает атом, если он есть, или создает новый
+                    audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
+                else:
+                    # Рейтинг 0 — удаляем атом, если он существует
+                    if self._RATE_TAG in audio.tags:
+                        del audio.tags[self._RATE_TAG]
                 
-            # --- ЗАПИСЬ ЛАЙКА ---
+            # --- ЛАЙК ---
             if starred is not None:
-                try:
-                    value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
-                    audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
-                except Exception as e:
-                    logger.error(f"MP4 like write prep err ({file_path}): {e}")
+                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
 
-            # --- Запись в файл ---
+            # --- Единая атомарная запись ---
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"MP4 write tags err ({file_path}): {e}")
