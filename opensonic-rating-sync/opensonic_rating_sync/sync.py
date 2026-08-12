@@ -96,11 +96,11 @@ class SyncAgent:
     def _get_action_str(self, w_star, w_rate, star_val, rate_val):
         parts = []
         if w_star:
-            parts.append("❤️" if star_val == 1 else "❌🤍")
+            parts.append("❤️" if star_val == 1 else "❌=🤍")
         if w_rate:
-            parts.append("⭐" * rate_val if rate_val > 0 else "❌⭐️")
+            parts.append("⭐" * rate_val if rate_val > 0 else "❌=⭐️")
         if not parts: return "FALSE"
-        return " + ".join(parts)
+        return "+".join(parts)
 
     def _resolve_lww(self, srv_val, f_val, db_srv_val, db_f_val, srv_mtime, f_mtime):
         """Архитектура Last-Write-Wins. Возвращает 'server', 'file' или 'none'."""
