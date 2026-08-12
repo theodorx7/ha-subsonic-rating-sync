@@ -278,37 +278,19 @@ class MP4Handler(RatingHandler):
             starred = 0
             
             # --- ЧТЕНИЕ РЕЙТИНГА ---
-            try:
-                # Читаем то, что реально есть в файле (согласно логу)
-                rating_raw = audio.tags["rate"]
-                
-                # ДИАГНОСТИКА: Выводим тип и точное представление данных
-                val_to_log = rating_raw[0] if isinstance(rating_raw, list) else rating_raw
-                logger.debug(f"DIAG MP4 'rate' atom: Type={type(val_to_log).__name__}, Value={repr(val_to_log)}")
-                
-                if rating_raw:
-                    rate_val = rating_raw[0] if isinstance(rating_raw, list) else rating_raw
-                    # Mutagen может вернуть байты или сразу int, проверяем
-                    if isinstance(rate_val, bytes):
-                        rate_val = rate_val.decode('utf-8')
-                    m4a_rating = int(rate_val)
-                    if m4a_rating > 0:
-                        rating = max(1, min(10, round(m4a_rating / 10)))
-            except KeyError:
-                rating_raw = None
-            except Exception as e:
-                logger.debug(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
-                rating = None
+            rating_raw = audio.tags.get("rate")
+            if rating_raw:
+                m4a_rating = int(rating_raw[0])
+                if m4a_rating > 0:
+                    rating = max(1, min(10, round(m4a_rating / 10)))
+                except Exception as e:
+                    logger.debug(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
+                    rating = None
             
             # --- ЧТЕНИЕ ЛАЙКА ---
-            try:
-                like_raw = audio.tags[_LIKE_TAG_MP4]
-            except KeyError:
-                like_raw = None
-
+            like_raw = audio.tags.get(_LIKE_TAG_MP4)
             if like_raw:
-                try:
-                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+                starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
                 except Exception as e:
                     logger.debug(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
@@ -328,11 +310,11 @@ class MP4Handler(RatingHandler):
                     if rating > 0:
                         m4a_rating = str(max(10, min(100, rating * 10)))
                         # Перезаписывает атом, если он есть, или создает новый
-                        audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
+                        audio["rate"] = [m4a_rating.encode("utf-8")]
                     else:
                         # Рейтинг 0 — удаляем атом, если он существует
-                        if "----:com.apple.iTunes:RATE" in audio.tags:
-                            del audio.tags["----:com.apple.iTunes:RATE"]
+                        if "rate" in audio.tags:
+                            del audio.tags["rate"]
                 except Exception as e:
                     logger.error(f"MP4 rating write prep err ({file_path}): {e}")
                 
