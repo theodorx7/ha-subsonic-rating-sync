@@ -270,9 +270,6 @@ class MP4Handler(RatingHandler):
             audio = self._load(file_path)
             if not audio or not audio.tags:
                 return None, 0
-
-            # Временная строка для поиска правильного имени атома рейтинга
-            logger.debug(f"ALL MP4 TAGS ({os.path.basename(file_path)}): {list(audio.tags.keys())}")
             
             rating = None
             starred = 0
@@ -282,9 +279,6 @@ class MP4Handler(RatingHandler):
             if rating_raw:
                 try:
                     m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-#                    if isinstance(rate_val, bytes):
-#                        rate_val = rate_val.decode('utf-8')
- #                       m4a_rating = int(rate_val)
                     if m4a_rating > 0:
                         rating = max(1, min(10, round(m4a_rating / 10)))
                 except Exception as e:
@@ -295,7 +289,8 @@ class MP4Handler(RatingHandler):
             like_raw = audio.tags.get(_LIKE_TAG_MP4)
             if like_raw:
                 try:
-                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+#                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+                    starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
                 except Exception as e:
                     logger.debug(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
