@@ -351,7 +351,7 @@ class MP4Handler(RatingHandler):
                 r_status = False
             else:
                 r_status = True
-			
+
         # --- ЗАПИСЬ ЛАЙКА M4A ---
         if starred is not None:
             try:
@@ -363,7 +363,7 @@ class MP4Handler(RatingHandler):
             else:
                 s_status = True
 
-		# --- Запись в файл ---
+        # --- Запись в файл ---
         try:
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
