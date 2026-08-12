@@ -280,7 +280,9 @@ class MP4Handler(RatingHandler):
             # --- ЧТЕНИЕ РЕЙТИНГА ---
             rating_raw = audio.tags.get("rate")
             if rating_raw:
-                m4a_rating = int(rating_raw[0])
+                try:
+                    rate_val = rating_raw[0].decode('utf-8')
+                    m4a_rating = int(rate_val)
                 if m4a_rating > 0:
                     rating = max(1, min(10, round(m4a_rating / 10)))
                 except Exception as e:
@@ -290,7 +292,8 @@ class MP4Handler(RatingHandler):
             # --- ЧТЕНИЕ ЛАЙКА ---
             like_raw = audio.tags.get(_LIKE_TAG_MP4)
             if like_raw:
-                starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+                try:
+                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
                 except Exception as e:
                     logger.debug(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
