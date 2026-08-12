@@ -289,8 +289,7 @@ class MP4Handler(RatingHandler):
             like_raw = audio.tags.get(_LIKE_TAG_MP4)
             if like_raw:
                 try:
-#                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
-                    starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
+                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
                 except Exception as e:
                     logger.debug(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
