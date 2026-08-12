@@ -139,7 +139,6 @@ class ID3Handler(RatingHandler):
         return None, 0
 
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
-        try:
             audio = self._load(file_path)
             if audio is None: return None, None
             if audio.tags is None: audio.tags = ID3()
@@ -241,7 +240,6 @@ class XiphHandler(RatingHandler):
         return None, 0
 
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
-        try:
             audio = self._load(file_path)
             if audio:
                 # ЗАЩИТА: Если файл совсем без тегов, инициализируем пустой словарь
@@ -320,7 +318,6 @@ class MP4Handler(RatingHandler):
         return None, 0
     
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
-        try:
             audio = self._load(file_path)
             if audio is None: return None, None
             if audio.tags is None: audio.add_tags()
@@ -405,7 +402,6 @@ class ASFHandler(RatingHandler):
         return None, 0
     
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
-        try:
             audio = self._load(file_path)
             if audio is None: return None, None
             if audio.tags is None: 
