@@ -289,7 +289,7 @@ class MP4Handler(RatingHandler):
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
     
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
         try:
             audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
