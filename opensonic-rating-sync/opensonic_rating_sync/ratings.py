@@ -144,30 +144,36 @@ class ID3Handler(RatingHandler):
             if audio is None: return
             if audio.tags is None: audio.tags = ID3()
 
-            # --- РЕЙТИНГ ---
+            # --- ЗАПИСЬ РЕЙТИНГА ---
             if rating is not None:
-                # Конвертируем рейтинг (даже если это 0) в шкалу POPM
-                popm_rating = _internal_rating_to_popm(rating)
-                # Получаем все существующие фреймы POPM за один вызов
-                popm_frames = audio.tags.getall("POPM")
-                
-                if popm_frames:
-                    # Фреймы есть: обновляем рейтинг в каждом из них
-                    for frame in popm_frames:
-                        frame.rating = popm_rating
-                        # НЕ трогаем frame.count! Если счетчик там был, он сохранится. Если нет — останется отсутствовать.
-                        # Это закладывает фундамент для будущей работы со счетчиком без изменения логики сейчас.
-                else:
-                    # Фреймов нет: создаем один стандартный с нужным рейтингом
-                    # count не указываем, так как он опционален в спецификации ID3
-                    audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating))
+                try:
+                    # Конвертируем рейтинг (даже если это 0) в шкалу POPM
+                    popm_rating = _internal_rating_to_popm(rating)
+                    # Получаем все существующие фреймы POPM за один вызов
+                    popm_frames = audio.tags.getall("POPM")
+                    
+                    if popm_frames:
+                        # Фреймы есть: обновляем рейтинг в каждом из них
+                        for frame in popm_frames:
+                            frame.rating = popm_rating
+                            # НЕ трогаем frame.count! Если счетчик там был, он сохранится. Если нет — останется отсутствовать.
+                            # Это закладывает фундамент для будущей работы со счетчиком без изменения логики сейчас.
+                    else:
+                        # Фреймов нет: создаем один стандартный с нужным рейтингом
+                        # count не указываем, так как он опционален в спецификации ID3
+                        audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating))
+                except Exception as e:
+                    logger.error(f"ID3 rating write prep err ({file_path}): {e}")
             
-            # --- ЛАЙК ---
+            # --- ЗАПИСЬ ЛАЙКА ---
             if starred is not None:
-                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
-                audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG, text=value))
+                try:
+                    value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                    audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG, text=value))
+                except Exception as e:
+                    logger.error(f"ID3 like write prep err ({file_path}): {e}")
             
-            # --- Единая атомарная запись ---
+            # --- Запись в файл ---
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"ID3 write tags err ({file_path}): {e}")
@@ -228,21 +234,27 @@ class XiphHandler(RatingHandler):
                 if audio.tags is None:
                     audio.add_tags()
 
-                # --- РЕЙТИНГ ---
+                # --- ЗАПИСЬ РЕЙТИНГА ---
                 if rating is not None:
-                    if rating > 0:
-                        # Перезаписывает тег, если он есть, или создает новый
-                        audio["RATING"] = str(max(10, min(100, rating * 10)))
-                    else:
-                        # Рейтинг 0 — удаляем тег, если он физически существует
-                        if "RATING" in audio:
-                            del audio["RATING"]
+                    try:
+                        if rating > 0:
+                            # Перезаписывает тег, если он есть, или создает новый
+                            audio["RATING"] = str(max(10, min(100, rating * 10)))
+                        else:
+                            # Рейтинг 0 — удаляем тег, если он физически существует
+                            if "RATING" in audio:
+                                del audio["RATING"]
+                    except Exception as e:
+                        logger.error(f"Xiph rating write prep err ({file_path}): {e}")
                 
-                # --- ЛАЙК ---
+                # --- ЗАПИСЬ ЛАЙКА ---
                 if starred is not None:
-                    audio[_LIKE_TAG] = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                    try:
+                        audio[_LIKE_TAG] = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                    except Exception as e:
+                        logger.error(f"Xiph like write prep err ({file_path}): {e}")
 
-                # --- Единая атомарная запись ---
+                # --- Запись в файл ---
                 self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"Xiph write tags err ({file_path}): {e}")
@@ -294,23 +306,29 @@ class MP4Handler(RatingHandler):
             audio = self._load(file_path)
             if audio.tags is None: audio.add_tags()
             
-            # --- РЕЙТИНГ ---
+            # --- ЗАПИСЬ РЕЙТИНГА ---
             if rating is not None:
                 if rating > 0:
-                    m4a_rating = str(max(10, min(100, rating * 10)))
-                    # Перезаписывает атом, если он есть, или создает новый
-                    audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
-                else:
-                    # Рейтинг 0 — удаляем атом, если он существует
-                    if "----:com.apple.iTunes:RATE" in audio.tags:
-                        del audio.tags["----:com.apple.iTunes:RATE"]
+                try:
+                        m4a_rating = str(max(10, min(100, rating * 10)))
+                        # Перезаписывает атом, если он есть, или создает новый
+                        audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
+                    else:
+                        # Рейтинг 0 — удаляем атом, если он существует
+                        if "----:com.apple.iTunes:RATE" in audio.tags:
+                            del audio.tags["----:com.apple.iTunes:RATE"]
+                except Exception as e:
+                    logger.error(f"MP4 rating write prep err ({file_path}): {e}")
                 
-            # --- ЛАЙК ---
+            # --- ЗАПИСЬ ЛАЙКА ---
             if starred is not None:
-                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
-                audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
+                try:
+                    value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                    audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
+                except Exception as e:
+                    logger.error(f"MP4 like write prep err ({file_path}): {e}")
 
-            # --- Единая атомарная запись ---
+            # --- Запись в файл ---
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"MP4 write tags err ({file_path}): {e}")
@@ -359,22 +377,29 @@ class ASFHandler(RatingHandler):
             if audio.tags is None: 
                 audio.add_tags()
             
-            # --- РЕЙТИНГ ---
+            # --- ЗАПИСЬ РЕЙТИНГА ---
             if rating is not None:
-                if rating > 0:
-                    wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
-                    # Перезаписывает атрибут, если он есть, или создает новый
-                    audio.tags["WM/SharedUserRating"] = ASFDWordAttribute(wma_rating)
-                else:
-                    # Рейтинг 0 — удаляем атрибут по точному ключу, если он существует
-                    if "WM/SharedUserRating" in audio.tags:
-                        del audio.tags["WM/SharedUserRating"]
+                try:
+                    if rating > 0:
+                        wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
+                        # Перезаписывает атрибут, если он есть, или создает новый
+                        audio.tags["WM/SharedUserRating"] = ASFDWordAttribute(wma_rating)
+                    else:
+                        # Рейтинг 0 — удаляем атрибут по точному ключу, если он существует
+                        if "WM/SharedUserRating" in audio.tags:
+                            del audio.tags["WM/SharedUserRating"]
+                except Exception as e:
+                    logger.error(f"ASF rating write prep err ({file_path}): {e}")
                 
-            # --- ЛАЙК ---
+            # --- ЗАПИСЬ ЛАЙКА ---
             if starred is not None:
-                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
-                audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
+                try:
+                    value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                    audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
+                except Exception as e:
+                    logger.error(f"ASF like write prep err ({file_path}): {e}")
 
+            # --- Запись в файл ---
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
             logger.error(f"ASF write tags err ({file_path}): {e}")
