@@ -104,29 +104,34 @@ class ID3Handler(RatingHandler):
             rating = None
             starred = 0
             
-            # 1. Чтение рейтинга (POPM)
+            # --- ЧТЕНИЕ РЕЙТИНГА ---
             popm_frames = audio.tags.getall("POPM")
             if popm_frames:
-                selected_popm = None
-                # Ищем по списку приоритетных плееров
-                for email in _KNOWN_PRIMARY_RATING_PLAYERS:
-                    selected_popm = next((f for f in popm_frames if f.email == email), None)
-                    if selected_popm:
-                        break
-                
-                # Если ничего из приоритетного не нашли - берем первый попавшийся
-                if not selected_popm:
-                    selected_popm = popm_frames[0]
-                
-                rating = _popm_rating_to_internal(selected_popm.rating, selected_popm.email)
+                try:
+                    selected_popm = None
+                    # Ищем по списку приоритетных плееров
+                    for email in _KNOWN_PRIMARY_RATING_PLAYERS:
+                        selected_popm = next((f for f in popm_frames if f.email == email), None)
+                        if selected_popm:
+                            break
+                    
+                    # Если ничего из приоритетного не нашли - берем первый попавшийся
+                    if not selected_popm:
+                        selected_popm = popm_frames[0]
+                    
+                    rating = _popm_rating_to_internal(selected_popm.rating, selected_popm.email)
+                except Exception as e:
+                    logger.debug(f"ID3 rating parse err ({file_path}): {e} | Raw: {popm_frames}")
+                    rating = None
             
-            # --- ЛАЙК ---
+            # --- ЧТЕНИЕ ЛАЙКА ---
             like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG}")
             if like_frames:
                 try:
                     val_raw = like_frames[0].text[0]
                     starred = 1 if val_raw == _LIKE_VALUE_ON else 0
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"ID3 like parse err ({file_path}): {e} | Raw: {like_frames}")
                     starred = 0
             
             return rating, starred
@@ -189,21 +194,26 @@ class XiphHandler(RatingHandler):
             rating = None
             starred = 0
             
-            # 1. Чтение рейтинга
+            # --- ЧТЕНИЕ РЕЙТИНГА ---
             rating_raw = audio.get("RATING")
             if rating_raw:
-                # ИСПРАВЛЕНИЕ: str() нужен, чтобы переварить объект APETextValue из APE/WavPack, который int() не умеет читать напрямую и падает с ошибкой.
-                xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
-                if xiph_rating > 0:
-                    # ИСПРАВЛЕНИЕ: Если рейтинг <= 10 (шкала 0-5 в APE), умножаем на 2. Если > 10 (шкала 0-100 в FLAC), делим на 10. Иначе 5 звезд превратятся в 0.5 звезды.
-                    rating = max(1, min(10, xiph_rating * 2 if xiph_rating <= 10 else round(xiph_rating / 10)))
+                try:
+                    # ИСПРАВЛЕНИЕ: str() нужен, чтобы переварить объект APETextValue из APE/WavPack, который int() не умеет читать напрямую и падает с ошибкой.
+                    xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
+                    if xiph_rating > 0:
+                        # ИСПРАВЛЕНИЕ: Если рейтинг <= 10 (шкала 0-5 в APE), умножаем на 2. Если > 10 (шкала 0-100 в FLAC), делим на 10. Иначе 5 звезд превратятся в 0.5 звезды.
+                        rating = max(1, min(10, xiph_rating * 2 if xiph_rating <= 10 else round(xiph_rating / 10)))
+                except Exception as e:
+                    logger.debug(f"Xiph rating parse err ({file_path}): {e} | Raw: {rating_raw}")
+                    rating = None
             
-            # --- ЛАЙК ---
+            # --- ЧТЕНИЕ ЛАЙКА ---
             like_raw = audio.get(_LIKE_TAG)
             if like_raw:
                 try:
                     starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Xiph like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
             
             return rating, starred
@@ -252,7 +262,7 @@ class MP4Handler(RatingHandler):
             rating = None
             starred = 0
             
-            # --- РЕЙТИНГ ---
+            # --- ЧТЕНИЕ РЕЙТИНГА ---
             rating_raw = audio.tags.get("----:com.apple.iTunes:RATE")
             if rating_raw:
                 try:
@@ -262,15 +272,17 @@ class MP4Handler(RatingHandler):
                     m4a_rating = int(rate_val)
                     if m4a_rating > 0:
                         rating = max(1, min(10, round(m4a_rating / 10)))
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
                     rating = None
             
-            # --- ЛАЙК ---
+            # --- ЧТЕНИЕ ЛАЙКА ---
             like_raw = audio.tags.get(_LIKE_TAG_MP4)
             if like_raw:
                 try:
                     starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
             
             return rating, starred
@@ -317,19 +329,24 @@ class ASFHandler(RatingHandler):
             rating = None
             starred = 0
             
-            # 1. Чтение рейтинга
+            # --- ЧТЕНИЕ РЕЙТИНГА ---
             rating_raw = audio.tags.get("WM/SharedUserRating")
             if rating_raw:
-                wma_rating = rating_raw[0].value
-                if wma_rating > 0:
-                    rating = _WMA_RATING_READ_MAP.get(wma_rating)
+                try:
+                    wma_rating = rating_raw[0].value
+                    if wma_rating > 0:
+                        rating = _WMA_RATING_READ_MAP.get(wma_rating)
+                except Exception as e:
+                    logger.debug(f"ASF rating parse err ({file_path}): {e} | Raw: {rating_raw}")
+                    rating = None
             
-            # --- ЛАЙК ---
+            # --- ЧТЕНИЕ ЛАЙКА ---
             like_raw = audio.tags.get(_LIKE_TAG_ASF)
             if like_raw:
                 try:
                     starred = 1 if like_raw[0].value == _LIKE_VALUE_ON else 0
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"ASF like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
             
             return rating, starred
