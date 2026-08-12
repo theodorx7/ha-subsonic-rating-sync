@@ -300,6 +300,11 @@ class MP4Handler(RatingHandler):
             audio = self._load(file_path)
             rating = None
             starred = 0
+
+            # --- ДИАГНОСТИКА: Вывод всех реальных ключей в файле ---
+            # Временная строка для поиска правильного имени атома рейтинга
+            logger.debug(f"ALL MP4 TAGS ({os.path.basename(file_path)}): {list(audio.tags.keys())}")
+            
             if audio.tags:
                 rating_raw = audio.tags.get(self._RATE_TAG)
                 if rating_raw:
