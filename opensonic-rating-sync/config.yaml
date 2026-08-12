@@ -13,6 +13,7 @@ init: false
 #homeassistant_api: true
 map:
   - media:rw
+  - share:rw
 
 options:
   server_protocol: "https"
