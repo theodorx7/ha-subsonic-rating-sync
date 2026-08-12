@@ -327,37 +327,38 @@ class MP4Handler(RatingHandler):
         return None, 0
     
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
-		audio = self._load(file_path)
-		if audio.tags is None: audio.add_tags()
+        audio = self._load(file_path)
+        if audio is None: return None, None
+        if audio.tags is None: audio.add_tags()
 
         r_status = None
         s_status = None
 
-		# --- ЗАПИСЬ РЕЙТИНГА M4A ---
-		if rating is not None:
-			try:
-				if rating > 0:
-					m4a_rating = str(max(10, min(100, rating * 10)))
-					# ИСПРАВЛЕНО: Передаем строку (str), а не байты! 
-					# Для коротких атомов (как "rate") Mutagen ожидает str, чтобы записать как текст.
-					audio["rate"] = [m4a_rating]
-				else:
-					# Рейтинг 0 — удаляем короткий атом "rate"
-					if "rate" in audio.tags:
-						del audio.tags["rate"]
-			except Exception as e:
-				logger.error(f"MP4 rating write prep err ({file_path}): {e}")
+        # --- ЗАПИСЬ РЕЙТИНГА M4A ---
+        if rating is not None:
+            try:
+                if rating > 0:
+                    m4a_rating = str(max(10, min(100, rating * 10)))
+                    # ИСПРАВЛЕНО: Передаем строку (str), а не байты! 
+                    # Для коротких атомов (как "rate") Mutagen ожидает str, чтобы записать как текст.
+                    audio["rate"] = [m4a_rating]
+                else:
+                    # Рейтинг 0 — удаляем короткий атом "rate"
+                    if "rate" in audio.tags:
+                        del audio.tags["rate"]
+            except Exception as e:
+                logger.error(f"MP4 rating write prep err ({file_path}): {e}")
                 r_status = False
             else:
                 r_status = True
 			
-		# --- ЗАПИСЬ ЛАЙКА M4A ---
-		if starred is not None:
-			try:
-				value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
-				audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
-			except Exception as e:
-				logger.error(f"MP4 like write prep err ({file_path}): {e}")
+        # --- ЗАПИСЬ ЛАЙКА M4A ---
+        if starred is not None:
+            try:
+                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
+            except Exception as e:
+                logger.error(f"MP4 like write prep err ({file_path}): {e}")
                 s_status = False
             else:
                 s_status = True
