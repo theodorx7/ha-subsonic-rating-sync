@@ -282,7 +282,7 @@ class MP4Handler(RatingHandler):
             if rating_raw:
                 try:
                     rate_val = rating_raw[0].decode('utf-8')
-#                    m4a_rating = int(rate_val)
+                    m4a_rating = int(rate_val)
                     if m4a_rating > 0:
                         rating = max(1, min(10, round(m4a_rating / 10)))
                 except Exception as e:
