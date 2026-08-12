@@ -305,10 +305,17 @@ class MP4Handler(RatingHandler):
                     if self._RATE_TAG in audio.tags:
                         del audio.tags[self._RATE_TAG]
                 
-            # --- ЛАЙК ---
+            # --- ЗАПИСЬ ЛАЙКА M4A ---
             if starred is not None:
-                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
-                audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
+                try:
+                    value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+                    audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
+                except Exception as e:
+                    logger.error(f"MP4 like write prep err ({file_path}): {e}")
+            
+            return rating, starred
+        except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
+        return None, 0
 
             # --- Единая атомарная запись ---
             self._safe_save(audio, file_path, atomic_save)
