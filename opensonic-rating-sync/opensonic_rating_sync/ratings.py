@@ -270,6 +270,9 @@ class MP4Handler(RatingHandler):
             audio = self._load(file_path)
             if not audio or not audio.tags:
                 return None, 0
+
+            # Временная строка для поиска правильного имени атома рейтинга
+            logger.debug(f"ALL MP4 TAGS ({os.path.basename(file_path)}): {list(audio.tags.keys())}")
             
             rating = None
             starred = 0
