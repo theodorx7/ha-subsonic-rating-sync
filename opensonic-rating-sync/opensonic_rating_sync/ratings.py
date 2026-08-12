@@ -310,13 +310,13 @@ class MP4Handler(RatingHandler):
             if rating is not None:
                 if rating > 0:
                 try:
-                        m4a_rating = str(max(10, min(100, rating * 10)))
-                        # Перезаписывает атом, если он есть, или создает новый
-                        audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
-                    else:
-                        # Рейтинг 0 — удаляем атом, если он существует
-                        if "----:com.apple.iTunes:RATE" in audio.tags:
-                            del audio.tags["----:com.apple.iTunes:RATE"]
+                    m4a_rating = str(max(10, min(100, rating * 10)))
+                    # Перезаписывает атом, если он есть, или создает новый
+                    audio["----:com.apple.iTunes:RATE"] = [m4a_rating.encode("utf-8")]
+                else:
+                    # Рейтинг 0 — удаляем атом, если он существует
+                    if "----:com.apple.iTunes:RATE" in audio.tags:
+                        del audio.tags["----:com.apple.iTunes:RATE"]
                 except Exception as e:
                     logger.error(f"MP4 rating write prep err ({file_path}): {e}")
                 
