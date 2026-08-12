@@ -292,73 +292,77 @@ class XiphHandler(RatingHandler):
 
 # --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
 class MP4Handler(RatingHandler):
-    _RATE_TAG = "----:com.apple.iTunes:RATE"
-    
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
+            if not audio or not audio.tags:
+                return None, 0
+            
             rating = None
             starred = 0
-
-            # --- ДИАГНОСТИКА: Вывод всех реальных ключей в файле ---
-            # Временная строка для поиска правильного имени атома рейтинга
-            logger.debug(f"ALL MP4 TAGS ({os.path.basename(file_path)}): {list(audio.tags.keys())}")
             
-            if audio.tags:
-                rating_raw = audio.tags.get(self._RATE_TAG)
-                if rating_raw:
+            # --- ЧТЕНИЕ РЕЙТИНГА M4A ---
+            rating_raw = audio.tags.get("rate")
+            if rating_raw:
+                try:
                     m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
-                    if m4a_rating == 0: rating = None
-                    else: rating = max(1, min(10, round(m4a_rating / 10)))
-                if _LIKE_TAG_MP4 in audio.tags:
-                    # ИСПРАВЛЕНИЕ: Железобетонное чтение для M4A атомов
-                    try:
-                        val_str = audio.tags[_LIKE_TAG_MP4][0].decode('utf-8').strip().upper()
-                        starred = 1 if val_str == _LIKE_VALUE_ON else 0
-                    except Exception:
-                        starred = 0
+                    if m4a_rating > 0:
+                        rating = max(1, min(10, round(m4a_rating / 10)))
+                except Exception as e:
+                    logger.debug(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
+                    rating = None 
+            
+            # --- ЧТЕНИЕ ЛАЙКА M4A ---
+            like_raw = audio.tags.get(_LIKE_TAG_MP4)
+            if like_raw:
+                try:
+                    starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
+                except Exception as e:
+                    logger.debug(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
+                    starred = 0
+            
             return rating, starred
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
     
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
-        audio = self._load(file_path)
-        if audio is None: return None, None
-        if audio.tags is None: audio.add_tags()
+		audio = self._load(file_path)
+		if audio.tags is None: audio.add_tags()
 
         r_status = None
         s_status = None
-        
-        # --- РЕЙТИНГ ---
-        if rating is not None:
-            try:
-                if rating > 0:
-                    m4a_rating = str(max(10, min(100, rating * 10)))
-                    # Перезаписывает атом, если он есть, или создает новый
-                    audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
-                else:
-                    # Рейтинг 0 — удаляем атом, если он существует
-                    if self._RATE_TAG in audio.tags:
-                        del audio.tags[self._RATE_TAG]
-            except Exception as e:
-                logger.error(f"MP4 rating write prep err ({file_path}): {e}")
+
+		# --- ЗАПИСЬ РЕЙТИНГА M4A ---
+		if rating is not None:
+			try:
+				if rating > 0:
+					m4a_rating = str(max(10, min(100, rating * 10)))
+					# ИСПРАВЛЕНО: Передаем строку (str), а не байты! 
+					# Для коротких атомов (как "rate") Mutagen ожидает str, чтобы записать как текст.
+					audio["rate"] = [m4a_rating]
+				else:
+					# Рейтинг 0 — удаляем короткий атом "rate"
+					if "rate" in audio.tags:
+						del audio.tags["rate"]
+			except Exception as e:
+				logger.error(f"MP4 rating write prep err ({file_path}): {e}")
                 r_status = False
             else:
                 r_status = True
-            
-        # --- ЗАПИСЬ ЛАЙКА M4A ---
-        if starred is not None:
-            try:
-                value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
-                audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
-            except Exception as e:
-                logger.error(f"MP4 like write prep err ({file_path}): {e}")
+			
+		# --- ЗАПИСЬ ЛАЙКА M4A ---
+		if starred is not None:
+			try:
+				value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
+				audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
+			except Exception as e:
+				logger.error(f"MP4 like write prep err ({file_path}): {e}")
                 s_status = False
             else:
                 s_status = True
-        
-        # --- Запись в файл ---
+
+		# --- Запись в файл ---
         try:
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
@@ -373,6 +377,7 @@ class MP4Handler(RatingHandler):
 
 # --- СТРАТЕГИЯ WMA (Windows Media Audio / ASF) ---
 class ASFHandler(RatingHandler):
+    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
@@ -409,8 +414,7 @@ class ASFHandler(RatingHandler):
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
         audio = self._load(file_path)
         if audio is None: return None, None
-        if audio.tags is None: 
-            audio.add_tags()
+        if audio.tags is None: audio.add_tags()
 
         r_status = None
         s_status = None
