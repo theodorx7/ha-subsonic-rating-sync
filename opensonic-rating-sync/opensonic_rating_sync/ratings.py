@@ -30,7 +30,7 @@ _LIKE_VALUE_BAN = "B"
 # --- БАЗОВЫЙ КЛАСС СТРАТЕГИИ ---
 class RatingHandler:
     def read_all(self, file_path: str): raise NotImplementedError
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None: raise NotImplementedError
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple: raise NotImplementedError
     def _load(self, file_path: str): raise NotImplementedError
 
     def _safe_save(self, audio, file_path: str, atomic_save: bool = False):
@@ -92,7 +92,7 @@ def _internal_rating_to_popm(internal_rating):
     if internal_rating == 0 or internal_rating is None: return 0
     return _PRIMARY_MP3_RATING_MAP.get(internal_rating, 0)
 
-# --- СТРАТЕГИИ ID3 (MP3 / AIFF) ---
+# --- СТРАТЕГИИ ID3 (MP3 / AIFF /WAV ) ---
 class ID3Handler(RatingHandler):
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
@@ -138,11 +138,14 @@ class ID3Handler(RatingHandler):
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
         return None, 0
 
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
         try:
             audio = self._load(file_path)
-            if audio is None: return
+            if audio is None: return None, None
             if audio.tags is None: audio.tags = ID3()
+
+            r_status = None
+            s_status = None
 
             # --- ЗАПИСЬ РЕЙТИНГА ---
             if rating is not None:
@@ -164,6 +167,9 @@ class ID3Handler(RatingHandler):
                         audio.tags.add(POPM(email=_RATING_EMAIL, rating=popm_rating))
                 except Exception as e:
                     logger.error(f"ID3 rating write prep err ({file_path}): {e}")
+                    r_status = False
+                else:
+                    r_status = True
             
             # --- ЗАПИСЬ ЛАЙКА ---
             if starred is not None:
@@ -172,12 +178,20 @@ class ID3Handler(RatingHandler):
                     audio.tags.add(TXXX(encoding=3, desc=_LIKE_TAG, text=value))
                 except Exception as e:
                     logger.error(f"ID3 like write prep err ({file_path}): {e}")
+                    s_status = False
+                else:
+                    s_status = True
             
             # --- Запись в файл ---
-            self._safe_save(audio, file_path, atomic_save)
-        except Exception as e: 
-            logger.error(f"ID3 write tags err ({file_path}): {e}")
-            raise
+            try:
+                self._safe_save(audio, file_path, atomic_save)
+            except Exception as e: 
+                logger.error(f"ID3 write tags err ({file_path}): {e}")
+                if r_status: r_status = False
+                if s_status: s_status = False
+                raise
+            
+            return r_status, s_status
 
 class MP3Handler(ID3Handler):
     def _load(self, file_path): return MP3(file_path, ID3=ID3)
@@ -226,13 +240,16 @@ class XiphHandler(RatingHandler):
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
 
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
         try:
             audio = self._load(file_path)
             if audio:
                 # ЗАЩИТА: Если файл совсем без тегов, инициализируем пустой словарь
                 if audio.tags is None:
                     audio.add_tags()
+
+                r_status = None
+                s_status = None
 
                 # --- ЗАПИСЬ РЕЙТИНГА ---
                 if rating is not None:
@@ -246,6 +263,9 @@ class XiphHandler(RatingHandler):
                                 del audio["RATING"]
                     except Exception as e:
                         logger.error(f"Xiph rating write prep err ({file_path}): {e}")
+                        r_status = False
+                    else:
+                        r_status = True
                 
                 # --- ЗАПИСЬ ЛАЙКА ---
                 if starred is not None:
@@ -253,12 +273,22 @@ class XiphHandler(RatingHandler):
                         audio[_LIKE_TAG] = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
                     except Exception as e:
                         logger.error(f"Xiph like write prep err ({file_path}): {e}")
+                        s_status = False
+                    else:
+                        s_status = True
 
                 # --- Запись в файл ---
-                self._safe_save(audio, file_path, atomic_save)
-        except Exception as e: 
-            logger.error(f"Xiph write tags err ({file_path}): {e}")
-            raise
+                try:
+                    self._safe_save(audio, file_path, atomic_save)
+                except Exception as e: 
+                    logger.error(f"Xiph write tags err ({file_path}): {e}")
+                    if r_status: r_status = False
+                    if s_status: s_status = False
+                    raise
+                
+                return r_status, s_status
+            
+            return None, None
 
     def _load(self, file_path): return MutagenFile(file_path)
 
@@ -289,21 +319,31 @@ class MP4Handler(RatingHandler):
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
     
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
         try:
             audio = self._load(file_path)
+            if audio is None: return None, None
             if audio.tags is None: audio.add_tags()
+
+            r_status = None
+            s_status = None
             
             # --- РЕЙТИНГ ---
             if rating is not None:
-                if rating > 0:
-                    m4a_rating = str(max(10, min(100, rating * 10)))
-                    # Перезаписывает атом, если он есть, или создает новый
-                    audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
+                try:
+                    if rating > 0:
+                        m4a_rating = str(max(10, min(100, rating * 10)))
+                        # Перезаписывает атом, если он есть, или создает новый
+                        audio[self._RATE_TAG] = [m4a_rating.encode("utf-8")]
+                    else:
+                        # Рейтинг 0 — удаляем атом, если он существует
+                        if self._RATE_TAG in audio.tags:
+                            del audio.tags[self._RATE_TAG]
+                except Exception as e:
+                    logger.error(f"MP4 rating write prep err ({file_path}): {e}")
+                    r_status = False
                 else:
-                    # Рейтинг 0 — удаляем атом, если он существует
-                    if self._RATE_TAG in audio.tags:
-                        del audio.tags[self._RATE_TAG]
+                    r_status = True
                 
             # --- ЗАПИСЬ ЛАЙКА M4A ---
             if starred is not None:
@@ -312,16 +352,20 @@ class MP4Handler(RatingHandler):
                     audio[_LIKE_TAG_MP4] = [bytes(value, 'utf-8')]
                 except Exception as e:
                     logger.error(f"MP4 like write prep err ({file_path}): {e}")
+                    s_status = False
+                else:
+                    s_status = True
             
-            return rating, starred
-        except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
-        return None, 0
-
-            # --- Единая атомарная запись ---
-            self._safe_save(audio, file_path, atomic_save)
-        except Exception as e: 
-            logger.error(f"MP4 write tags err ({file_path}): {e}")
-            raise
+            # --- Запись в файл ---
+            try:
+                self._safe_save(audio, file_path, atomic_save)
+            except Exception as e: 
+                logger.error(f"MP4 write tags err ({file_path}): {e}")
+                if r_status: r_status = False
+                if s_status: s_status = False
+                raise
+            
+            return r_status, s_status
 
     def _load(self, file_path): return MP4(file_path)
 
@@ -360,11 +404,15 @@ class ASFHandler(RatingHandler):
         except Exception as e: logger.error(f"ASF read all err ({file_path}): {e}")
         return None, 0
     
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
+    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
         try:
             audio = self._load(file_path)
+            if audio is None: return None, None
             if audio.tags is None: 
                 audio.add_tags()
+
+            r_status = None
+            s_status = None
             
             # --- ЗАПИСЬ РЕЙТИНГА ---
             if rating is not None:
@@ -379,6 +427,9 @@ class ASFHandler(RatingHandler):
                             del audio.tags["WM/SharedUserRating"]
                 except Exception as e:
                     logger.error(f"ASF rating write prep err ({file_path}): {e}")
+                    r_status = False
+                else:
+                    r_status = True
                 
             # --- ЗАПИСЬ ЛАЙКА ---
             if starred is not None:
@@ -387,12 +438,20 @@ class ASFHandler(RatingHandler):
                     audio.tags[_LIKE_TAG_ASF] = ASFUnicodeAttribute(value)
                 except Exception as e:
                     logger.error(f"ASF like write prep err ({file_path}): {e}")
+                    s_status = False
+                else:
+                    s_status = True
 
             # --- Запись в файл ---
-            self._safe_save(audio, file_path, atomic_save)
-        except Exception as e: 
-            logger.error(f"ASF write tags err ({file_path}): {e}")
-            raise
+            try:
+                self._safe_save(audio, file_path, atomic_save)
+            except Exception as e: 
+                logger.error(f"ASF write tags err ({file_path}): {e}")
+                if r_status: r_status = False
+                if s_status: s_status = False
+                raise
+            
+            return r_status, s_status
 
     def _load(self, file_path): return ASF(file_path)
 
@@ -407,9 +466,11 @@ def get_handler(file_path: str) -> RatingHandler | None:
     ext = os.path.splitext(file_path)[1].lower()
     return HANDLER_REGISTRY.get(ext)
 
-def set_tags_to_file(file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> None:
+def set_tags_to_file(file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
     handler = get_handler(file_path)
-    if handler: handler.write_tags(file_path, rating, starred, atomic_save)
+    if handler: 
+        return handler.write_tags(file_path, rating, starred, atomic_save)
+    return None, None
 
 def get_all_ratings_from_file(file_path: str):
     handler = get_handler(file_path)
