@@ -25,7 +25,7 @@ options:
   dry_run: false
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
-  sync_schedule_type: "interval"
+  sync_schedule_type: "off"
   sync_interval_hours: 24
   sync_time: "03:00"
   atomic_save: false
