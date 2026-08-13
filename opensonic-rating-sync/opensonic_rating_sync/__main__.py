@@ -55,14 +55,16 @@ def main() -> None:
             agent.run_sync()
         except Exception as e:
             success = False
-            # Логируем и ПРОДОЛЖАЕМ работу — транзитная ошибка сети
-            # не должна валить весь аддон и провоцировать watchdog-рестарты.
+            # Log and PROCEED — transient network errors shouldn't take down the addon or trigger watchdog restarts.
             logger.error("Unexpected error during sync: %s", e, exc_info=True)
 
         # MANUAL SYNCHRONIZATION MODE
         if schedule_type == "off":
-            status_msg = "с ошибкой" if not success else "успешно"
-            logger.info("Разовый запуск %s. Авто-синхронизация отключена. Ожидание ручного перезапуска аддона.", status_msg)
+            if not success:
+                logger.error("Unexpected error during sync. No next run scheduled — auto-sync disabled.")
+            else:
+                logger.info("Sync completed successfully. No next run scheduled — auto-sync disabled.")
+
             while True:
                 time.sleep(3600)
 
@@ -94,9 +96,9 @@ def main() -> None:
                 raise SystemExit(1)
 
         if not success:
-            logger.warning("⚠️ Синхронизация прервана из-за непредвиденной ошибки! Следующая попытка: %s", next_time_str)
+            logger.warning("⚠️ Sync aborted due to an unexpected error! Next retry: %s", next_time_str)
         else:
-            logger.info("Синхронизация завершена. Следующий запуск: %s", next_time_str)
+            logger.info("Sync completed successfully. Next run: %s", next_time_str)
 
         time.sleep(sleep_seconds)
 
