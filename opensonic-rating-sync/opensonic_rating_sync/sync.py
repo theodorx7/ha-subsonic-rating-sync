@@ -101,30 +101,17 @@ class SyncAgent:
 
     def _resolve_lww(self, srv_val, f_val, db_srv_val, db_f_val, srv_mtime, f_mtime):
         """Архитектура Last-Write-Wins. Возвращает 'server', 'file' или 'none'."""
-        srv_val = 0 if srv_val is None else srv_val
-        f_val = 0 if f_val is None else f_val
-        db_srv_val = 0 if db_srv_val is None else db_srv_val
-        db_f_val = 0 if db_f_val is None else db_f_val
-
         srv_changed = (srv_val != db_srv_val)
         f_changed = (f_val != db_f_val)
 
-        # 1. Никто не менялся
-        if not srv_changed and not f_changed:
-            if srv_val == f_val: return 'none', max(srv_mtime, f_mtime)
-            # Стабильная дивергенция! Если меток времени нет (0) - ждет пользователя
-            if f_mtime == 0 and srv_mtime == 0: return 'unresolved', 0
-            if f_mtime > srv_mtime: return 'file', f_mtime
-            if srv_mtime > f_mtime: return 'server', srv_mtime
-            return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
-
-        # 2. Изменился только сервер
+        # 1. Изменился только сервер
         if srv_changed and not f_changed: return 'server', srv_mtime
-        # 3. Изменился только файл
+        # 2. Изменился только файл
         if not srv_changed and f_changed: return 'file', f_mtime
         
-        # 4. Изменились оба (одновременно)
+        # 3. Никто не менялся ИЛИ изменились оба (логика разрешения одинакова)
         if srv_val == f_val: return 'none', max(srv_mtime, f_mtime)
+        # Стабильная дивергенция! Если меток времени нет (0) - ждет пользователя
         if f_mtime == 0 and srv_mtime == 0: return 'unresolved', 0
         if f_mtime > srv_mtime: return 'file', f_mtime
         if srv_mtime > f_mtime: return 'server', srv_mtime
