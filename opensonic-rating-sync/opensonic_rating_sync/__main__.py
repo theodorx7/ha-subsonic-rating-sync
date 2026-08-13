@@ -29,7 +29,7 @@ def load_config() -> dict:
         "music_library_id":      raw.get("music_library_id", ""),
         "sync_mode":            raw.get("sync_mode", ""),
         "conflict_resolution":  raw.get("conflict_resolution", ""),
-        "sync_interval_minutes": int(raw.get("sync_interval_minutes") or 60),
+        "sync_interval_hours": int(raw.get("sync_interval_hours") or 0),
         "dry_run":              bool(raw.get("dry_run", False)),
         "atomic_save":          bool(raw.get("atomic_save", False)),
         "debug":                bool(raw.get("debug", False)),
@@ -65,18 +65,28 @@ def main() -> None:
 
     agent = SyncAgent(config)
 
-    # Цикл планировщика
+    # Если интервал не задан (0) — выполняем один цикл и "засыпаем" навсегда
+    if config["sync_interval_hours"] == 0:
+        try:
+            agent.run_sync()
+        except Exception as e:
+            logger.error("Критическая ошибка при запуске: %s", e, exc_info=True)
+        
+        logger.info("Период синхронизации не задан в настройках приложения - автоматическая синхронизация отключена.")
+        while True:
+            time.sleep(3600)  # Бесконечный сон без нагрузки на CPU
+    
+    # Цикл планировщика (если интервал задан)
     while True:
         try:
             agent.run_sync()
         except Exception as e:
             # Логируем и ПРОДОЛЖАЕМ работу — транзитная ошибка сети
             # не должна валить весь аддон и провоцировать watchdog-рестарты.
-            logger.error("Критическая ошибка в цикле: %s", e, exc_info=True)
+            logger.error("Критическая ошибка в цикле синхронизации: %s", e, exc_info=True)
 
-        sleep_seconds = config["sync_interval_minutes"] * 60
-        logger.info("Сон %s секунд до следующего цикла...", sleep_seconds)
-        time.sleep(sleep_seconds)
+        logger.info("Сон %s час(ов/а) до следующего цикла...", config["sync_interval_hours"])
+        time.sleep(config["sync_interval_hours"] * 3600)
 
 
 if __name__ == "__main__":
