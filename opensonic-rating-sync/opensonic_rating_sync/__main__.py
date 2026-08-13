@@ -48,20 +48,19 @@ def main() -> None:
 
     agent = SyncAgent(config)
 
-    # INTERVAL SYNCHRONIZATION MODE
-    if config["sync_schedule_type"] == "interval":
-        # If the interval is not set (0), we perform one cycle and "fall asleep" forever.
-        if config["sync_interval_hours"] == 0:
-            try:
-                agent.run_sync()
-            except Exception as e:
-                logger.error("Критическая ошибка при запуске: %s", e, exc_info=True)
-            
-            logger.info("Sync interval not set in app settings — auto-sync disabled.")
-            while True:
-                time.sleep(3600)
+    # OFF MODE (Manual sync only)
+    if config["sync_schedule_type"] == "off":
+        try:
+            agent.run_sync()
+        except Exception as e:
+            logger.error("Критическая ошибка при запуске: %s", e, exc_info=True)
         
-        # Scheduler cycle (if the interval is set)
+        logger.info("Auto-sync disabled. One-time cycle completed.")
+        while True:
+            time.sleep(3600)
+    
+    # INTERVAL SYNCHRONIZATION MODE
+    elif config["sync_schedule_type"] == "interval":
         while True:
             try:
                 agent.run_sync()
@@ -72,7 +71,7 @@ def main() -> None:
 
             logger.info("Sleeping for %s hour(s) until next cycle...", config["sync_interval_hours"])
             time.sleep(config["sync_interval_hours"] * 3600)
-
+        
     # DAILY SYNCHRONIZATION MODE
     elif config["sync_schedule_type"] == "daily":
         target_time = config["sync_time"]
