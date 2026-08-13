@@ -33,10 +33,10 @@ class SyncAgent:
             ok = self.conn.ping()
             if not ok:
                 raise ConnectionError("ping() вернул False")
-            logger.info(f"Подключение к Navidrome установлено: {base_url}:{config['server_port']} (Username/Password, ping OK)")
+            logger.info(f"Подключение к серверу установлено: {base_url}:{config['server_port']}")
         except Exception as e:
-            logger.error(f"Ошибка подключения к Navidrome ({base_url}:{config['server_port']}): {e}")
-            raise
+            logger.error(f"Ошибка подключения к серверу ({base_url}:{config['server_port']}): {e}")
+            raise SystemExit(1)
 
     def _track_label(self, song, file_path=None):
         """Формирует строку вида: Artist - Title | Filename"""
