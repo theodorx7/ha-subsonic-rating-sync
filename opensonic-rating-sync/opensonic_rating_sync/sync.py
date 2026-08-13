@@ -167,7 +167,7 @@ class SyncAgent:
         # ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ОТЛАДКИ (проблема с mtime):
         # if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
         f_rating_internal, f_starred = ratings.get_all_ratings_from_file(file_path)
-        logger.info(f"READ FROM FILE: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred}")
+        logger.debug(f"READ FROM FILE: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred}")
         # else:
         #     f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
         #     f_rating_internal = db_state['file_rating']
@@ -220,7 +220,7 @@ class SyncAgent:
                 final_f_rate_mtime = 0
                 final_s_rate_mtime = 0
                 if is_new_file:
-                    logger.info(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
+                    logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
             else:
                 t_rate_os = srv_rating
                 t_rate_internal = f_rating_internal or (srv_rating * 2)
@@ -255,7 +255,7 @@ class SyncAgent:
             final_f_star_mtime = 0
             final_s_star_mtime = 0
             if is_new_file:
-                logger.info(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ ЛАЙКОВ (Нет данных о времени): Сервер={srv_starred}, Файл={f_starred}. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
+                logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ ЛАЙКОВ (Нет данных о времени): Сервер={srv_starred}, Файл={f_starred}. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
         else:
             t_star = srv_starred
             w_file_star, w_srv_star = False, False
