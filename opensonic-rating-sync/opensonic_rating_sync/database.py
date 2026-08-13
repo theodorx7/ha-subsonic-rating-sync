@@ -33,6 +33,9 @@ def get_track_state(song_id: str):
         return cursor.fetchone()
 
 def upsert_track_state(song_id: str, file_path: str, mtime_ns: int, 
+                       f_starred: int, f_rating: int, 
+                       s_starred: int, s_rating: int,
+                       f_rate_mtime: float, s_rate_mtime: float,
                        f_star_mtime: float, s_star_mtime: float):
     # НОРМАЛИЗАЦИЯ ДАННЫХ ПЕРЕД ЗАПИСЬЮ (ЗАПРЕТ None В БД)
     f_starred = int(f_starred) if f_starred is not None else 0
