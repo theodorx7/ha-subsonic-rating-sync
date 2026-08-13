@@ -47,41 +47,34 @@ def main() -> None:
     init_db()
 
     agent = SyncAgent(config)
+    schedule_type = config["sync_schedule_type"]
 
-    # OFF MODE (Manual sync only)
-    if config["sync_schedule_type"] == "off":
+    while True:
+        success = True
         try:
             agent.run_sync()
         except Exception as e:
-            logger.error("Критическая ошибка при запуске: %s", e, exc_info=True)
-        
-        logger.info("Auto-sync disabled. One-time cycle completed.")
-        while True:
-            time.sleep(3600)
-    
-    # INTERVAL SYNCHRONIZATION MODE
-    elif config["sync_schedule_type"] == "interval":
-        while True:
-            try:
-                agent.run_sync()
-            except Exception as e:
-                # Логируем и ПРОДОЛЖАЕМ работу — транзитная ошибка сети
-                # не должна валить весь аддон и провоцировать watchdog-рестарты.
-                logger.error("Критическая ошибка в цикле синхронизации: %s", e, exc_info=True)
+            success = False
+            # Логируем и ПРОДОЛЖАЕМ работу — транзитная ошибка сети
+            # не должна валить весь аддон и провоцировать watchdog-рестарты.
+            logger.error("Unexpected error during sync: %s", e, exc_info=True)
 
-            logger.info("Sleeping for %s hour(s) until next cycle...", config["sync_interval_hours"])
-            time.sleep(config["sync_interval_hours"] * 3600)
-        
-    # DAILY SYNCHRONIZATION MODE
-    elif config["sync_schedule_type"] == "daily":
-        target_time = config["sync_time"]
-        logger.info("Daily synchronization mode enabled. Target time: %s", target_time)
-        while True:
-            try:
-                agent.run_sync()
-            except Exception as e:
-                logger.error("Критическая ошибка в цикле синхронизации: %s", e, exc_info=True)
+        # MANUAL SYNCHRONIZATION MODE
+        if schedule_type == "off":
+            status_msg = "с ошибкой" if not success else "успешно"
+            logger.info("Разовый запуск %s. Авто-синхронизация отключена. Ожидание ручного перезапуска аддона.", status_msg)
+            while True:
+                time.sleep(3600)
 
+        next_time_str = ""
+        sleep_seconds = 0
+
+        if schedule_type == "interval":
+            sleep_hours = config["sync_interval_hours"]
+            sleep_seconds = sleep_hours * 3600
+            next_time_str = f"in {sleep_hours} h."
+        elif schedule_type == "daily":
+            target_time = config["sync_time"]
             now = datetime.datetime.now()
             try:
                 # Support for "03:00" and "03:00:00" formats
@@ -95,11 +88,17 @@ def main() -> None:
                     target += datetime.timedelta(days=1)
                 
                 sleep_seconds = int((target - now).total_seconds())
-                logger.info("Sleeping until %s...", target.strftime("%Y-%m-%d %H:%M:%S"))
-                time.sleep(sleep_seconds)
+                next_time_str = target.strftime("%Y-%m-%d %H:%M:%S")
             except ValueError:
                 logger.error("Invalid time format: '%s'. Use HH:MM or HH:MM:SS format. Application exiting.", target_time)
                 raise SystemExit(1)
+
+        if not success:
+            logger.warning("⚠️ Синхронизация прервана из-за непредвиденной ошибки! Следующая попытка: %s", next_time_str)
+        else:
+            logger.info("Синхронизация завершена. Следующий запуск: %s", next_time_str)
+
+        time.sleep(sleep_seconds)
 
 if __name__ == "__main__":
     main()
