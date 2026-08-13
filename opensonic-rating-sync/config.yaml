@@ -21,7 +21,7 @@ options:
   server_port: 4533
   user: "test"
   password: "test"
-  music_library_id: "2"
+  music_folder_id: "2"  # ID of the Music Library on the Subsonic server 
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
   sync_schedule_type: "interval"
@@ -36,7 +36,7 @@ schema:
   server_port: int?
   user: str
   password: password
-  music_library_id: str
+  music_folder_id: str  # ID of the Music Library on the Subsonic server
   sync_mode: list(two-way|file-to-server|server-to-file)
   conflict_resolution: list(server_wins|file_wins)
   sync_schedule_type: list(off|interval|daily)
