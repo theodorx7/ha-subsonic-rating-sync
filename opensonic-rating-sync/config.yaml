@@ -22,7 +22,6 @@ options:
   user: "test"
   password: "test"
   music_folder_id: "2"
-  music_folder: ""
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
   sync_interval_minutes: "1500"
@@ -36,7 +35,6 @@ schema:
   user: str
   password: password
   music_folder_id: str
-  music_folder: str?
   sync_mode: list(two-way|file-to-server|server-to-file)
   conflict_resolution: list(server_wins|file_wins)
   sync_interval_minutes: int?
