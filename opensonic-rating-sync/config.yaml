@@ -24,7 +24,7 @@ options:
   music_library_id: "2"
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
-  sync_interval_minutes: "1500"
+  sync_interval_hours: "24"
   dry_run: false
   atomic_save: false
   debug: true
