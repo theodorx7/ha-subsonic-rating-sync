@@ -147,7 +147,10 @@ class SyncAgent:
         if os.path.isabs(raw_path):
             file_path = raw_path
         else:
-            logger.error(f"Трек {self._track_label(song)}: Сервер вернул относительный путь. На сервере требуется включить настройку отдачи абсолютного пути для клиента 'Rating Sync Agent [Python]'")
+            logger.error(
+                "Received relative path from server. Enable absolute paths on the server for client 'Rating Sync Agent [Python]'.\n"
+                "To fix this: Open 'Players' menu ---> Find client 'Rating Sync Agent [Python]' ---> Enable 'Report Real Path' ---> Click SAVE."
+            )
             raise SystemExit(1)
     
         if not os.path.exists(file_path):
