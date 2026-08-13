@@ -218,14 +218,17 @@ class SyncAgent:
         db_srv_star = db_state['server_starred']
         db_f_star = db_state['file_starred']
         
-        # Теперь простое сравнение, как в рейтинге
         srv_star_changed = (srv_starred != db_srv_star)
         f_star_changed = (f_starred != db_f_star)
         
         new_f_star_mtime = now_time if f_star_changed else db_state['file_starred_mtime']
         new_s_star_mtime = now_time if srv_star_changed else db_state['server_starred_mtime']
         
-        star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star, db_f_star, new_s_star_mtime, new_f_star_mtime)
+        # ОПТИМИЗАЦИЯ ДЛЯ БИНАРНОГО ЗНАЧЕНИЯ: Если значения уже равны, нет смысла вычислять победителя
+        if srv_starred == f_starred:
+            star_winner, win_star_mtime = 'none', max(new_s_star_mtime, new_f_star_mtime)
+        else:
+            star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star, db_f_star, new_s_star_mtime, new_f_star_mtime)
         
         if star_winner == 'server':
             t_star = srv_starred
