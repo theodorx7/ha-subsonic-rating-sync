@@ -4,14 +4,30 @@ import time
 import datetime
 from pathlib import Path
 
-from .logger import setup_logger
+import logging
+import sys
 from .sync import SyncAgent
 from .database import init_db
 
-logger = setup_logger()
-
 OPTIONS_PATH = Path(os.environ.get("OPTIONS_PATH", "/data/options.json"))
 
+def setup_logging(debug: bool):
+    """Инициализация логгера для HA App. Вывод идет в stdout."""
+    level = logging.DEBUG if debug else logging.INFO
+    
+    logger = logging.getLogger()
+    logger.setLevel(level)
+    
+    if logger.handlers:
+        for handler in logger.handlers:
+            logger.removeHandler(handler)
+            
+    console_handler = logging.StreamHandler(sys.stdout)
+    
+    formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s', datefmt='%H:%M:%S')
+    console_handler.setFormatter(formatter)
+    
+    logger.addHandler(console_handler)
 
 def load_config() -> dict:
     """Reading addon configuration from /data/options.json."""
@@ -37,11 +53,16 @@ def load_config() -> dict:
 
 def main() -> None:
     config = load_config()
-
+    
+    setup_logging(config["debug"])
+    logger = logging.getLogger(__name__)
+    
     if config["debug"]:
         safe = {k: ("***" if k in ("password", "api_key") else v)
                 for k, v in config.items()}
-        logger.info("Configuration loaded: %s", safe)
+        logger.debug("Configuration loaded: %s", safe)
+    else:
+        logger.info("Configuration loaded. Debug mode is off.")
 
     logger.info("Initializing database...")
     init_db()
