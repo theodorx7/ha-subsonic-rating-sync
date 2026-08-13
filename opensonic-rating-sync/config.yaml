@@ -27,7 +27,7 @@ options:
   conflict_resolution: "server_wins"
   sync_schedule_type: "off"
   sync_interval_hours: 1
-  sync_time: "03:00:00"
+  sync_time: "04:00:00"
   atomic_save: false
   debug: true
 schema:
