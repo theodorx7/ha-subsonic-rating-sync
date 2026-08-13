@@ -39,7 +39,7 @@ schema:
   music_library_id: str
   sync_mode: list(two-way|file-to-server|server-to-file)
   conflict_resolution: list(server_wins|file_wins)
-  sync_schedule_type: list(interval|daily)
+  sync_schedule_type: list(off|interval|daily)
   sync_interval_hours: int?
   sync_time: str?
   dry_run: bool
