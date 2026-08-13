@@ -22,12 +22,12 @@ options:
   user: "test"
   password: "test"
   music_folder_id: "2"  # ID of the Music Library on the Subsonic server 
+  dry_run: false
   sync_mode: "two-way"
   conflict_resolution: "server_wins"
   sync_schedule_type: "interval"
   sync_interval_hours: 24
   sync_time: "03:00"
-  dry_run: false
   atomic_save: false
   debug: true
 schema:
@@ -37,12 +37,12 @@ schema:
   user: str
   password: password
   music_folder_id: str  # ID of the Music Library on the Subsonic server
+  dry_run: bool
   sync_mode: list(two-way|file-to-server|server-to-file)
   conflict_resolution: list(server_wins|file_wins)
   sync_schedule_type: list(off|interval|daily)
   sync_interval_hours: int?
   sync_time: str?
-  dry_run: bool
   atomic_save: bool
   debug: bool
   
