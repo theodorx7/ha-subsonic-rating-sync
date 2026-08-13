@@ -147,13 +147,10 @@ class SyncAgent:
     
         raw_path = unquote(song_path)
         if os.path.isabs(raw_path):
-            file_path = os.path.normpath(raw_path)
+            file_path = raw_path
         else:
-            base_folder = self.config.get('music_folder', '').strip()
-            if not base_folder:
-                logger.warning(f"Трек {self._track_label(song)}: Сервер вернул относительный путь, но опция 'music_folder' не настроена. Пропуск.")
-                return False, False
-            file_path = os.path.normpath(os.path.join(base_folder, raw_path.lstrip('/')))
+            logger.error(f"Трек {self._track_label(song)}: Сервер вернул относительный путь. Включите на сервере настройку отдачи абсолютного пути для клиента 'Rating Sync Agent [Python]'. Завершение работы приложения...")
+            raise SystemExit(1)
     
         if not os.path.exists(file_path):
             logger.warning(f"Файл не найден на диске: {file_path} (Трек: {self._track_label(song)})")
