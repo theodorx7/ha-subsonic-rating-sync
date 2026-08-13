@@ -67,7 +67,6 @@ class SyncAgent:
         elapsed_time = time.time() - start_time
         formatted_time = time.strftime('%H:%M:%S', time.gmtime(elapsed_time))
 
-        logger.info("Sync completed:")
         logger.info(f"      Files updated on DISK: {disk_updates}")
         logger.info(f"      Items updated on SERVER: {server_updates}")
         logger.info(f"      Execution time: {formatted_time}")
