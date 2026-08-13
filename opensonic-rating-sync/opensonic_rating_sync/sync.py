@@ -68,7 +68,7 @@ class SyncAgent:
         formatted_time = time.strftime('%H:%M:%S', time.gmtime(elapsed_time))
 
         logger.info(f"      Files updated on DISK: {disk_updates}")
-        logger.info(f"      Items updated on SERVER: {server_updates}")
+        logger.info(f"      Tracks updated on SERVER: {server_updates}")
         logger.info(f"      Execution time: {formatted_time}")
 
     def _fetch_all_server_songs(self):
