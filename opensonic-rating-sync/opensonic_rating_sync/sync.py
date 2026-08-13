@@ -88,6 +88,7 @@ class SyncAgent:
                 offset += count_per_request
         except Exception as e:
             logger.error(f"Ошибка при получении треков (search3): {e}", exc_info=True)
+            raise SystemExit(1)
         return songs
 
     def _get_action_str(self, w_star, w_rate, star_val, rate_val):
