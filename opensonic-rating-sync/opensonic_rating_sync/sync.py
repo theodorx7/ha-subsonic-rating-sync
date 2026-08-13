@@ -147,7 +147,7 @@ class SyncAgent:
         if os.path.isabs(raw_path):
             file_path = raw_path
         else:
-            logger.error(f"Трек {self._track_label(song)}: Сервер вернул относительный путь. Включите на сервере настройку отдачи абсолютного пути для клиента 'Rating Sync Agent [Python]'. Завершение работы приложения...")
+            logger.error(f"Трек {self._track_label(song)}: Сервер вернул относительный путь. На сервере требуется включить настройку отдачи абсолютного пути для клиента 'Rating Sync Agent [Python]'. Завершение работы приложения...")
             raise SystemExit(1)
     
         if not os.path.exists(file_path):
