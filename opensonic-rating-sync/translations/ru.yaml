@@ -14,9 +14,6 @@ configuration:
   password:
     name: Password
     description:
-  music_folder:
-    name: Music folder
-    description: Путь к папке с музыкой внутри контейнера (обычно /media/...).
   sync_interval_minutes:
     name: Sync interval (minutes)
     description: Периодичность синхронизации.
