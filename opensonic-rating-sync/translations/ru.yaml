@@ -15,7 +15,7 @@ configuration:
     name: Password
     description:
   sync_interval_minutes:
-    name: Sync interval (minutes)
+    name: Sync interval (hours)
     description: Периодичность синхронизации.
   conflict_resolution:
     name: Conflict resolution
