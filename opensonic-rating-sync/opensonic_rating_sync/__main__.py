@@ -76,6 +76,7 @@ def main() -> None:
             sleep_seconds = sleep_hours * 3600
             next_run = datetime.datetime.now() + datetime.timedelta(hours=sleep_hours)
             next_time_str = next_run.strftime("%Y-%m-%d %H:%M:%S")
+        
         elif schedule_type == "daily":
             target_time = config["sync_time"]
             now = datetime.datetime.now()
