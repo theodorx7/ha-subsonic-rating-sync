@@ -95,7 +95,7 @@ def main() -> None:
                     target += datetime.timedelta(days=1)
                 
                 sleep_seconds = int((target - now).total_seconds())
-                logger.info("Сон до %s...", target.strftime("%Y-%m-%d %H:%M:%S"))
+                logger.info("Sleeping until %s...", target.strftime("%Y-%m-%d %H:%M:%S"))
                 time.sleep(sleep_seconds)
             except ValueError:
                 logger.error("Invalid time format: '%s'. Use HH:MM or HH:MM:SS format. Application exiting.", target_time)
