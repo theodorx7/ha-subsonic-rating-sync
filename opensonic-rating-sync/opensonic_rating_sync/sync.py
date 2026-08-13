@@ -158,8 +158,8 @@ class SyncAgent:
 
         current_mtime = os.stat(file_path).st_mtime_ns
         db_state = get_track_state(song_id) or {
-            'file_mtime_ns': 0, 'file_starred': None, 'file_rating': None,
-            'server_starred': None, 'server_rating': None,
+            'file_mtime_ns': 0, 'file_starred': 0, 'file_rating': 0,
+            'server_starred': 0, 'server_rating': 0,
             'file_rating_mtime': 0, 'server_rating_mtime': 0,
             'file_starred_mtime': 0, 'server_starred_mtime': 0
         }
@@ -188,18 +188,18 @@ class SyncAgent:
             t_rate_os = srv_rating
             t_rate_internal = f_rating_internal or (srv_rating * 2)
             w_file_rate, w_srv_rate = False, False
-            final_f_rate_mtime = db_state['file_rating_mtime'] if db_state['file_rating_mtime'] else 0
-            final_s_rate_mtime = db_state['server_rating_mtime'] if db_state['server_rating_mtime'] else 0
+            final_f_rate_mtime = db_state['file_rating_mtime']
+            final_s_rate_mtime = db_state['server_rating_mtime']
         else:
             f_rating_os = math.ceil(f_rating_internal / 2)
-            db_srv_rating = db_state['server_rating'] or 0
-            db_f_rating = db_state['file_rating'] or 0
+            db_srv_rating = db_state['server_rating']
+            db_f_rating = db_state['file_rating']
             
             srv_changed = (srv_rating != db_srv_rating)
             f_changed = (f_rating_internal != db_f_rating)
             
-            new_f_rate_mtime = now_time if f_changed else (db_state['file_rating_mtime'] or 0)
-            new_s_rate_mtime = now_time if srv_changed else (db_state['server_rating_mtime'] or 0)
+            new_f_rate_mtime = now_time if f_changed else db_state['file_rating_mtime']
+            new_s_rate_mtime = now_time if srv_changed else db_state['server_rating_mtime']
             
             winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
             
@@ -228,18 +228,17 @@ class SyncAgent:
                 final_f_rate_mtime, final_s_rate_mtime = new_f_rate_mtime, new_s_rate_mtime
 
         # 2. ЛАЙК
-        # ИСПРАВЛЕНИЕ: Нормализуем None в 0, чтобы алгоритм LWW корректно отслеживал изменения для новых/перепривязанных треков
-        db_srv_star = db_state['server_starred'] or 0
-        db_f_star = db_state['file_starred'] or 0
+        db_srv_star = db_state['server_starred']
+        db_f_star = db_state['file_starred']
         
         # Теперь простое сравнение, как в рейтинге
         srv_star_changed = (srv_starred != db_srv_star)
         f_star_changed = (f_starred != db_f_star)
         
-        new_f_star_mtime = now_time if f_star_changed else (db_state['file_starred_mtime'] or 0)
-        new_s_star_mtime = now_time if srv_star_changed else (db_state['server_starred_mtime'] or 0)
+        new_f_star_mtime = now_time if f_star_changed else db_state['file_starred_mtime']
+        new_s_star_mtime = now_time if srv_star_changed else db_state['server_starred_mtime']
         
-        star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star or 0, db_f_star or 0, new_s_star_mtime, new_f_star_mtime)
+        star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star, db_f_star, new_s_star_mtime, new_f_star_mtime)
         
         if star_winner == 'server':
             t_star = srv_starred
