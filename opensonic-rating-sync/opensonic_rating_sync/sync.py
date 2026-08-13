@@ -33,25 +33,25 @@ class SyncAgent:
             ok = self.conn.ping()
             if not ok:
                 raise ConnectionError()
-            logger.info(f"Подключение к серверу установлено: {base_url}:{config['server_port']}")
+            logger.info(f"Connected to server: {base_url}:{config['server_port']}")
         except Exception as e:
-            logger.error(f"Ошибка подключения к серверу {base_url}:{config['server_port']}")
+            logger.error(f"Failed to connect to server: {base_url}:{config['server_port']}")
             raise SystemExit(1)
 
     def _track_label(self, song, file_path=None):
         """Формирует строку вида: Artist - Title | Filename"""
         artist = song.artist or ""
-        title = song.title or "<без названия>"
+        title = song.title or "<untitled>"
         artist_title = f"{artist} - {title}" if artist else title
-        name = os.path.basename(file_path) if file_path else song.path or "<нет пути>"
+        name = os.path.basename(file_path) if file_path else song.path or "<path missing>"
         return f"{artist_title} | {name}"
 
     def run_sync(self):
         start_time = time.time()
-        logger.info(f"Запущена синхронизация в режиме: {self.sync_mode}")
+        logger.info(f"Sync started in mode: {self.sync_mode}")
 
         server_songs = self._fetch_all_server_songs()
-        logger.info(f"Найдено треков на сервере: {len(server_songs)}")
+        logger.info(f"Found tracks on server: {len(server_songs)}")
         
         disk_updates = 0
         server_updates = 0
@@ -62,15 +62,15 @@ class SyncAgent:
                 if u_file: disk_updates += 1
                 if u_server: server_updates += 1
             except Exception as e:
-                logger.error(f"Ошибка при обработке трека {self._track_label(song)}: {e}", exc_info=True)
+                logger.error(f"Error processing track: {self._track_label(song)}: {e}", exc_info=True)
 
         elapsed_time = time.time() - start_time
         formatted_time = time.strftime('%H:%M:%S', time.gmtime(elapsed_time))
 
-        logger.info("Синхронизация завершена:")
-        logger.info(f"      Обновлено файлов на ДИСКЕ: {disk_updates}")
-        logger.info(f"      Обновлено элементов на СЕРВЕРЕ: {server_updates}")
-        logger.info(f"      Время выполнения: {formatted_time}")
+        logger.info("Sync completed:")
+        logger.info(f"      Files updated on DISK: {disk_updates}")
+        logger.info(f"      Items updated on SERVER: {server_updates}")
+        logger.info(f"      Execution time: {formatted_time}")
 
     def _fetch_all_server_songs(self):
         songs = []
@@ -87,7 +87,7 @@ class SyncAgent:
                 if len(fetched_songs) < count_per_request: break
                 offset += count_per_request
         except Exception as e:
-            logger.error(f"Ошибка при получении треков (search3): {e}", exc_info=True)
+            logger.error(f"Error fetching tracks (search3): {e}", exc_info=True)
             raise SystemExit(1)
         return songs
 
@@ -147,11 +147,11 @@ class SyncAgent:
         if os.path.isabs(raw_path):
             file_path = raw_path
         else:
-            logger.error(f"Трек {self._track_label(song)}: Сервер вернул относительный путь. На сервере требуется включить настройку отдачи абсолютного пути для клиента 'Rating Sync Agent [Python]'. Завершение работы приложения...")
+            logger.error(f"Трек {self._track_label(song)}: Сервер вернул относительный путь. На сервере требуется включить настройку отдачи абсолютного пути для клиента 'Rating Sync Agent [Python]'")
             raise SystemExit(1)
     
         if not os.path.exists(file_path):
-            logger.warning(f"Файл не найден на диске: {file_path} (Трек: {self._track_label(song)})")
+            logger.warning(f"File not found on disk:: {file_path} (Track on server: {self._track_label(song)})")
             return False, False
 
         current_mtime = os.stat(file_path).st_mtime_ns
