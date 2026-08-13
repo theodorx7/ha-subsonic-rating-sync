@@ -140,7 +140,7 @@ class SyncAgent:
     
         song_path = song.path
         if not song_path:
-            logger.warning(f"Трек {song_id} | {self._track_label(song)} не имеет атрибута path. Пропуск.")
+            logger.warning(f"Track {song_id} | {self._track_label(song)} has no attribute 'path'. Skip.")
             return False, False
     
         raw_path = unquote(song_path)
