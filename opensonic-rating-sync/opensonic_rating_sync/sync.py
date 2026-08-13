@@ -32,10 +32,10 @@ class SyncAgent:
         try:
             ok = self.conn.ping()
             if not ok:
-                raise ConnectionError("ping() вернул False")
+                raise ConnectionError()
             logger.info(f"Подключение к серверу установлено: {base_url}:{config['server_port']}")
         except Exception as e:
-            logger.error(f"Ошибка подключения к серверу ({base_url}:{config['server_port']}): {e}")
+            logger.error(f"Ошибка подключения к серверу {base_url}:{config['server_port']}")
             raise SystemExit(1)
 
     def _track_label(self, song, file_path=None):
