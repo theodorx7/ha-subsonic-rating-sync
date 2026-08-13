@@ -148,7 +148,7 @@ class SyncAgent:
         else:
             logger.error(
                 "Received relative path from server. Enable absolute paths on the server for client 'Rating Sync Agent [Python]'.\n"
-                "To fix this: Open 'Players' menu ---> Find client 'Rating Sync Agent [Python]' ---> Enable 'Report Real Path' ---> Click SAVE."
+                "If you are using Navidrome: in the menu, open the 'Players' section ---> Find and open the client settings named 'Rating Sync Agent [Python]' ---> Enable the 'Report Real Path' option ---> Click SAVE"
             )
             raise SystemExit(1)
     
