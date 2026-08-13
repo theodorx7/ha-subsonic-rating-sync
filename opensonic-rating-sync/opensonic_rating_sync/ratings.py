@@ -121,7 +121,7 @@ class ID3Handler(RatingHandler):
                     
                     rating = _popm_rating_to_internal(selected_popm.rating, selected_popm.email)
                 except Exception as e:
-                    logger.debug(f"ID3 rating parse err ({file_path}): {e} | Raw: {popm_frames}")
+                    logger.error(f"ID3 rating parse err ({file_path}): {e} | Raw: {popm_frames}")
                     rating = None
             
             # --- ЧТЕНИЕ ЛАЙКА ---
@@ -131,7 +131,7 @@ class ID3Handler(RatingHandler):
                     val_raw = like_frames[0].text[0]
                     starred = 1 if val_raw == _LIKE_VALUE_ON else 0
                 except Exception as e:
-                    logger.debug(f"ID3 like parse err ({file_path}): {e} | Raw: {like_frames}")
+                    logger.error(f"ID3 like parse err ({file_path}): {e} | Raw: {like_frames}")
                     starred = 0
             
             return rating, starred
@@ -223,7 +223,7 @@ class XiphHandler(RatingHandler):
                         # ИСПРАВЛЕНИЕ: Если рейтинг <= 10 (шкала 0-5 в APE), умножаем на 2. Если > 10 (шкала 0-100 в FLAC), делим на 10. Иначе 5 звезд превратятся в 0.5 звезды.
                         rating = max(1, min(10, xiph_rating * 2 if xiph_rating <= 10 else round(xiph_rating / 10)))
                 except Exception as e:
-                    logger.debug(f"Xiph rating parse err ({file_path}): {e} | Raw: {rating_raw}")
+                    logger.error(f"Xiph rating parse err ({file_path}): {e} | Raw: {rating_raw}")
                     rating = None
             
             # --- ЧТЕНИЕ ЛАЙКА ---
@@ -232,7 +232,7 @@ class XiphHandler(RatingHandler):
                 try:
                     starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
                 except Exception as e:
-                    logger.debug(f"Xiph like parse err ({file_path}): {e} | Raw: {like_raw}")
+                    logger.error(f"Xiph like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
             
             return rating, starred
@@ -310,7 +310,7 @@ class MP4Handler(RatingHandler):
                     if m4a_rating > 0:
                         rating = max(1, min(10, round(m4a_rating / 10)))
                 except Exception as e:
-                    logger.debug(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
+                    logger.error(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
                     rating = None 
             
             # --- ЧТЕНИЕ ЛАЙКА M4A ---
@@ -319,7 +319,7 @@ class MP4Handler(RatingHandler):
                 try:
                     starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
                 except Exception as e:
-                    logger.debug(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
+                    logger.error(f"MP4 like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
             
             return rating, starred
@@ -396,7 +396,7 @@ class ASFHandler(RatingHandler):
                     if wma_rating > 0:
                         rating = _WMA_RATING_READ_MAP.get(wma_rating)
                 except Exception as e:
-                    logger.debug(f"ASF rating parse err ({file_path}): {e} | Raw: {rating_raw}")
+                    logger.error(f"ASF rating parse err ({file_path}): {e} | Raw: {rating_raw}")
                     rating = None
             
             # --- ЧТЕНИЕ ЛАЙКА ---
@@ -405,7 +405,7 @@ class ASFHandler(RatingHandler):
                 try:
                     starred = 1 if like_raw[0].value == _LIKE_VALUE_ON else 0
                 except Exception as e:
-                    logger.debug(f"ASF like parse err ({file_path}): {e} | Raw: {like_raw}")
+                    logger.error(f"ASF like parse err ({file_path}): {e} | Raw: {like_raw}")
                     starred = 0
             
             return rating, starred
