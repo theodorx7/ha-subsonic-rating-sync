@@ -24,7 +24,7 @@ def load_config() -> dict:
         "server_port":          int(raw.get("server_port") or 443),
         "user":                 raw.get("user", ""),
         "password":             raw.get("password", ""),
-        "music_library_id":      raw.get("music_library_id", ""),
+        "music_folder_id":      raw.get("music_folder_id", ""),
         "sync_mode":            raw.get("sync_mode", ""),
         "conflict_resolution":  raw.get("conflict_resolution", ""),
         "sync_schedule_type":   raw.get("sync_schedule_type", "interval"),
