@@ -74,12 +74,12 @@ class SyncAgent:
 
     def _fetch_all_server_songs(self):
         songs = []
-        mf_id = self.config['music_library_id']
+        mf_id = self.config['music_folder_id']
         try:
             offset = 0
             count_per_request = 500
             while True:
-                result = self.conn.search3(query="", song_count=count_per_request, song_offset=offset, music_library_id=mf_id)
+                result = self.conn.search3(query="", song_count=count_per_request, song_offset=offset, music_folder_id=mf_id)
                 if not result: break
                 fetched_songs = result.song or []
                 if not fetched_songs: break
