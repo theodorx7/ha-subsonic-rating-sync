@@ -48,7 +48,7 @@ class SyncAgent:
 
     def run_sync(self):
         start_time = time.time()
-        logger.info(f"Начало цикла синхронизации в режиме: {self.sync_mode}")
+        logger.info(f"Запущена синхронизация в режиме: {self.sync_mode}")
 
         server_songs = self._fetch_all_server_songs()
         logger.info(f"Найдено треков на сервере: {len(server_songs)}")
