@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
@@ -35,25 +34,8 @@ def load_config() -> dict:
         "debug":                bool(raw.get("debug", False)),
     }
 
-
-def validate(config: dict) -> None:
-    """Страховочная проверка обязательных полей.
-
-    Supervisor сам не запустит аддон без server_host
-    (schema: `str` без `?` + options: `null`), но эта проверка
-    защищает при ручном запуске контейнера и при локальной отладке.
-    """
-    if not config["server_host"]:
-        logger.error(
-            "Поле 'server_host' обязательно для заполнения. "
-            "Укажите адрес сервера в настройках приложения."
-        )
-        sys.exit(1)
-
-
 def main() -> None:
     config = load_config()
-    validate(config)
 
     if config["debug"]:
         safe = {k: ("***" if k in ("password", "api_key") else v)
