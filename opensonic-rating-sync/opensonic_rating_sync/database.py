@@ -33,10 +33,17 @@ def get_track_state(song_id: str):
         return cursor.fetchone()
 
 def upsert_track_state(song_id: str, file_path: str, mtime_ns: int, 
-                       f_starred: int, f_rating: int, 
-                       s_starred: int, s_rating: int,
-                       f_rate_mtime: float, s_rate_mtime: float,
                        f_star_mtime: float, s_star_mtime: float):
+    # НОРМАЛИЗАЦИЯ ДАННЫХ ПЕРЕД ЗАПИСЬЮ (ЗАПРЕТ None В БД)
+    f_starred = int(f_starred) if f_starred is not None else 0
+    f_rating = int(f_rating) if f_rating is not None else 0
+    s_starred = int(s_starred) if s_starred is not None else 0
+    s_rating = int(s_rating) if s_rating is not None else 0
+    f_rate_mtime = float(f_rate_mtime) if f_rate_mtime is not None else 0.0
+    s_rate_mtime = float(s_rate_mtime) if s_rate_mtime is not None else 0.0
+    f_star_mtime = float(f_star_mtime) if f_star_mtime is not None else 0.0
+    s_star_mtime = float(s_star_mtime) if s_star_mtime is not None else 0.0
+
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         
