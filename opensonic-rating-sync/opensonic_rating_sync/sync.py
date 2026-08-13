@@ -74,15 +74,15 @@ class SyncAgent:
 
     def _fetch_all_server_songs(self):
         songs = []
-        mf_id = self.config.get('music_folder_id') or None
+        mf_id = self.config.get('music_library_id') or None
         if not mf_id:
-            logger.error("Не указан music_folder_id в настройках аддона!")
+            logger.error("В настройках приложения не заполнено поле ID Music Library.")
             return songs
         try:
             offset = 0
             count_per_request = 500
             while True:
-                result = self.conn.search3(query="", song_count=count_per_request, song_offset=offset, music_folder_id=mf_id)
+                result = self.conn.search3(query="", song_count=count_per_request, song_offset=offset, music_library_id=mf_id)
                 if not result: break
                 fetched_songs = result.song or []
                 if not fetched_songs: break
