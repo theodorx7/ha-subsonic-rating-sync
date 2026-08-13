@@ -74,10 +74,7 @@ class SyncAgent:
 
     def _fetch_all_server_songs(self):
         songs = []
-        mf_id = self.config.get('music_library_id') or None
-        if not mf_id:
-            logger.error("В настройках приложения не заполнено поле ID Music Library.")
-            return songs
+        mf_id = self.config['music_library_id']
         try:
             offset = 0
             count_per_request = 500
