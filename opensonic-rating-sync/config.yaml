@@ -37,7 +37,7 @@ schema:
   music_library_id: str
   sync_mode: list(two-way|file-to-server|server-to-file)
   conflict_resolution: list(server_wins|file_wins)
-  sync_interval_minutes: int?
+  sync_interval_hours: int?
   dry_run: bool
   atomic_save: bool
   debug: bool
