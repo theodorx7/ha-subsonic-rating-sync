@@ -24,7 +24,22 @@ def setup_logging(debug: bool):
             
     console_handler = logging.StreamHandler(sys.stdout)
     
-    formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s', datefmt='%H:%M:%S')
+    class BashioFormatter(logging.Formatter):
+        _COLORS = {
+            logging.INFO: "\033[32m",     # GREEN
+            logging.WARNING: "\033[33m",  # YELLOW
+            logging.ERROR: "\033[35m",    # MAGENTA
+            logging.CRITICAL: "\033[31m", # RED
+        }
+        _RESET = "\033[0m"
+        
+        def format(self, record):
+            color = self._COLORS.get(record.levelno, "")
+            if color and isinstance(record.msg, str):
+                record.msg = f"{color}{record.msg}{self._RESET}"
+            return super().format(record)
+
+    formatter = BashioFormatter('[%(asctime)s] %(levelname)s: %(message)s', datefmt='%H:%M:%S')
     console_handler.setFormatter(formatter)
     
     logger.addHandler(console_handler)
