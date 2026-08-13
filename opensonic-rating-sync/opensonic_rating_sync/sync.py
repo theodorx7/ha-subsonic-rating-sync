@@ -48,7 +48,7 @@ class SyncAgent:
 
     def run_sync(self):
         start_time = time.time()
-        logger.info(f"Начало цикла синхронизации (режим: {self.sync_mode})...")
+        logger.info(f"Начало цикла синхронизации в режиме: {self.sync_mode}")
 
         server_songs = self._fetch_all_server_songs()
         logger.info(f"Найдено треков на сервере: {len(server_songs)}")
@@ -67,7 +67,7 @@ class SyncAgent:
         elapsed_time = time.time() - start_time
         formatted_time = time.strftime('%H:%M:%S', time.gmtime(elapsed_time))
 
-        logger.info("Цикл синхронизации завершен:")
+        logger.info("Синхронизация завершена:")
         logger.info(f"      Обновлено файлов на ДИСКЕ: {disk_updates}")
         logger.info(f"      Обновлено элементов на СЕРВЕРЕ: {server_updates}")
         logger.info(f"      Время выполнения: {formatted_time}")
