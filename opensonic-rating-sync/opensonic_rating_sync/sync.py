@@ -37,7 +37,7 @@ class SyncAgent:
             logger.info(f"Connected to server: {base_url}:{config['server_port']}")
         except Exception as e:
             logger.error(f"Failed to connect to server: {base_url}:{config['server_port']}")
-            raise SystemExit(1)
+            raise ConnectionError(f"Server connection failed: {base_url}:{config['server_port']}")
 
     def _track_label(self, song, file_path=None):
         """Формирует строку вида: Artist - Title | Filename"""
