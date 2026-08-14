@@ -150,16 +150,16 @@ class SyncAgent:
             'file_rating_mtime': 0, 'server_rating_mtime': 0,
             'file_starred_mtime': 0, 'server_starred_mtime': 0
         }
+        # ОПТИМИЗАЦИЯ: Читаем теги с диска только если изменилось время файла (mtime)
+        if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
+            f_rating_internal, f_starred = ratings.get_all_ratings_from_file(file_path)
+            logger.debug(f"READ FROM FILE: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred}")
+        else:
+            # Берем сохраненные значения из БД (гарантированно числа, None быть не может)
+            f_starred = db_state['file_starred']
+            f_rating_internal = db_state['file_rating']
 
-        # ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ОТЛАДКИ (проблема с mtime):
-        # if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
-        f_rating_internal, f_starred = ratings.get_all_ratings_from_file(file_path)
-        logger.debug(f"READ FROM FILE: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred}")
-        # else:
-        #     f_starred = db_state['file_starred'] if db_state['file_starred'] is not None else 0
-        #     f_rating_internal = db_state['file_rating']
-
-        # ИСПРАВЛЕНИЕ: Нормализуем None в 0 для рейтинга и лайков
+        # Нормализуем None в 0 (если тегов нет вообще, mutagen может вернуть None)
         f_rating_internal = f_rating_internal if f_rating_internal is not None else 0
         f_starred = f_starred if f_starred is not None else 0
 
