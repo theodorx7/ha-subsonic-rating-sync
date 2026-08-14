@@ -62,6 +62,8 @@ class SyncAgent:
                 u_file, u_server = self._process_song(song)
                 if u_file: disk_updates += 1
                 if u_server: server_updates += 1
+            except RuntimeError:
+                raise
             except Exception as e:
                 logger.error(f"Error processing track: {self._track_label(song)}: {e}", exc_info=True)
 
@@ -150,7 +152,7 @@ class SyncAgent:
                 "Received relative path from server. Enable absolute paths on the server for client 'Rating Sync Agent [Python]'.\n"
                 "If you are using Navidrome: in the menu, open the 'Players' section ---> Find and open the client settings named 'Rating Sync Agent [Python]' ---> Enable the 'Report Real Path' option ---> Click SAVE"
             )
-            raise SystemExit(1)
+            raise RuntimeError("Server returns relative paths instead of absolute.")
     
         # Один вызов os.stat вместо os.path.exists + os.stat для I/O оптимизации.
         try:
