@@ -201,7 +201,7 @@ class AIFFHandler(ID3Handler):
 class WAVHandler(ID3Handler):
     def _load(self, file_path): return WAVE(file_path)
 
-# --- СТРАТЕГИЯ XIPH (FLAC, OGG, OPUS, APE) ---
+# --- СТРАТЕГИЯ XIPH (FLAC, OGG, OPUS, APE, WavPack) ---
 class XiphHandler(RatingHandler):
     # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
     def read_all(self, file_path: str):
@@ -217,11 +217,13 @@ class XiphHandler(RatingHandler):
             rating_raw = audio.get("RATING")
             if rating_raw:
                 try:
-                    # ИСПРАВЛЕНИЕ: str() нужен, чтобы переварить объект APETextValue из APE/WavPack, который int() не умеет читать напрямую и падает с ошибкой.
-                    xiph_rating = int(str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw))
-                    if xiph_rating > 0:
-                        # ИСПРАВЛЕНИЕ: Если рейтинг <= 10 (шкала 0-5 в APE), умножаем на 2. Если > 10 (шкала 0-100 в FLAC), делим на 10. Иначе 5 звезд превратятся в 0.5 звезды.
-                        rating = max(1, min(10, xiph_rating * 2 if xiph_rating <= 10 else round(xiph_rating / 10)))
+                     # 1. str() нужен, чтобы переварить объект APETextValue из APE/WavPack
+                     raw_str = str(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
+                     # 2. Заменяем запятую на точку (русская локаль Windows: "2,5" -> "2.5")
+                     # 3. Используем float() для чтения дроби, int() это сделать не может
+                     xiph_rating = float(raw_str.replace(',', '.').strip())
+                     if xiph_rating > 0:
+                         rating = max(1, min(10, xiph_rating * 2 if xiph_rating <= 10 else round(xiph_rating / 10)))
                 except Exception as e:
                     logger.error(f"Xiph rating parse err ({file_path}): {e} | Raw: {rating_raw}")
                     rating = None
