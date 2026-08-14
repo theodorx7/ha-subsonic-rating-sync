@@ -211,6 +211,15 @@ class SyncAgent:
             new_s_rate_mtime = now_time if (srv_changed and not is_new_file) else db_state['server_rating_mtime']
             
             winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
+            
+            # Односторонняя синхронизация при обоюдном изменении (не первый запуск):
+            # Главная сторона всегда выигрывает, сохраняя главенство источника (не работает как жесткое зеркало).
+            if not is_new_file:
+                if self.sync_mode == 'file-to-server' and f_changed:
+                    winner, win_mtime = 'file', new_f_rate_mtime
+                elif self.sync_mode == 'server-to-file' and srv_changed:
+                    winner, win_mtime = 'server', new_s_rate_mtime
+
             # Односторонняя синхронизация при первом запуске (unresolved):
             # Главная сторона принудительно становится победителем, чтобы затереть данные на другой стороне.
             if winner == 'unresolved':
@@ -264,6 +273,14 @@ class SyncAgent:
         else:
             star_winner, win_star_mtime = self._resolve_lww(srv_starred, f_starred, db_srv_star, db_f_star, new_s_star_mtime, new_f_star_mtime)
         
+        # Односторонняя синхронизация при обоюдном изменении (не первый запуск):
+        # Главная сторона всегда выигрывает, сохраняя главенство источника (не работает как жесткое зеркало).
+        if not is_new_file:
+            if self.sync_mode == 'file-to-server' and f_star_changed:
+                star_winner, win_star_mtime = 'file', new_f_star_mtime
+            elif self.sync_mode == 'server-to-file' and srv_star_changed:
+                star_winner, win_star_mtime = 'server', new_s_star_mtime
+
         if star_winner == 'server':
             t_star = srv_starred
             w_file_star, w_srv_star = True, False
