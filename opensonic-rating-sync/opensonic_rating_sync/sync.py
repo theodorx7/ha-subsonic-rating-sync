@@ -226,7 +226,7 @@ class SyncAgent:
                 final_f_rate_mtime = 0
                 final_s_rate_mtime = 0
                 if is_new_file:
-                    logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест и запустите синхронизацию повторно. ({self._track_label(song, file_path)})")
+                    logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест и запустите синхронизацию повторно. ({self._track_label(song, file_path)})")
 
         # ОТКЛЮЧЕНИЕ СИНХРОНИЗАЦИИ РЕЙТИНГОВ
         if not self.config.get('sync_ratings', True):
@@ -276,7 +276,7 @@ class SyncAgent:
             final_f_star_mtime = db_state['file_starred_mtime']
             final_s_star_mtime = db_state['server_starred_mtime']
         
-        # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (С учетом блокировки режима) ---
+        # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (с учетом блокировки режима) ---
         if not write_file and not write_server:
             if not self.config.get('dry_run', False):
                 blocked_by_mode = (w_file_star or w_file_rate or w_srv_star or w_srv_rate)
