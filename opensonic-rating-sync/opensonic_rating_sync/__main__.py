@@ -84,12 +84,12 @@ def main() -> None:
     logger.info("Initializing database...")
     init_db()
 
-    agent = SyncAgent(config)
     schedule_type = config["sync_schedule_type"]
 
     while True:
         success = True
         try:
+            agent = SyncAgent(config)
             agent.run_sync()
         except Exception as e:
             success = False
