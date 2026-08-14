@@ -192,6 +192,7 @@ class SyncAgent:
         
         # 1. РЕЙТИНГ
         f_rating_5_scale = f_rating_internal / 2.0
+        is_rating_unresolved = False
         if abs(f_rating_5_scale - srv_rating) <= 0.5:
             t_rate_os = srv_rating
             t_rate_internal = f_rating_internal or (srv_rating * 2)
@@ -227,8 +228,8 @@ class SyncAgent:
                 w_file_rate, w_srv_rate = False, False
                 final_f_rate_mtime = 0
                 final_s_rate_mtime = 0
-                if is_new_file:
-                    logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест и запустите синхронизацию повторно. ({self._track_label(song, file_path)})")
+                is_rating_unresolved = True
+                logger.warning(f"{prefix}ID {song_id} — ⚠️КОНФЛИКТ РЕЙТИНГА (нет данных о времени изменений): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★ —  ({self._track_label(song, file_path)}). Измените оценку в одном из мест и запустите синхронизацию повторно или разово запустите синхронизацию в одну сторону, а затем переключить режим синхронизации снова на двухсторонний.")
 
         # ОТКЛЮЧЕНИЕ СИНХРОНИЗАЦИИ РЕЙТИНГОВ
         if not self.config.get('sync_ratings', True):
@@ -281,6 +282,9 @@ class SyncAgent:
         # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (с учетом блокировки режима) ---
         if not write_file and not write_server:
             if not self.config.get('dry_run', False):
+                if is_rating_unresolved:
+                    return False, False
+
                 blocked_by_mode = (w_file_star or w_file_rate or w_srv_star or w_srv_rate)
                 if blocked_by_mode:
                     # Сохраняем ТЕКУЩИЕ значения и ТЕКУЩИЕ метки времени (новые)
@@ -406,5 +410,4 @@ class SyncAgent:
             f_star_mtime=actual_f_star_mtime if self.config.get('sync_likes', True) else db_state['file_starred_mtime'], 
             s_star_mtime=actual_s_star_mtime if self.config.get('sync_likes', True) else db_state['server_starred_mtime']
         )
-        # ИЗМЕНЕНИЕ: Возвращаем объединенный флаг файловой записи и флаг серверной записи
         return (actual_f_rate_write or actual_f_star_write), actual_srv_write
