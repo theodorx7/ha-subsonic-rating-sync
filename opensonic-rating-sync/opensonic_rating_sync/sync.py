@@ -321,7 +321,7 @@ class SyncAgent:
         ws_str = self._get_action_str(write_server and w_srv_star, write_server and w_srv_rate, t_star, t_rate_os)
         
         logger.info(
-            f"{prefix}ID {song_id} — Обновляем файл={wf_str} | Обновляем сервер={ws_str} — "
+            f"{prefix}ID {song_id} — Update file={wf_str} | Update server={ws_str} — "
             f"({self._track_label(song, file_path)})"
         )
         
@@ -372,7 +372,7 @@ class SyncAgent:
                         else:
                             actual_srv_write = True
         except Exception as e:
-            logger.error(f"Ошибка записи для трека {song_id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
+            logger.error(f"Write error for track {song_id} | {self._track_label(song, file_path)}: {e}", exc_info=True)
 
         # ВЫЧИСЛЕНИЕ ФАКТИЧЕСКИХ МЕТОК ВРЕМЕНИ
         # Если мы пытались записать в файл (w_file_rate/star = True), обновляем метку только при успехе (actual_file_write).
