@@ -228,6 +228,14 @@ class SyncAgent:
                 if is_new_file:
                     logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
 
+        # ОТКЛЮЧЕНИЕ СИНХРОНИЗАЦИИ РЕЙТИНГОВ
+        if not self.config.get('sync_ratings', True):
+            w_file_rate, w_srv_rate = False, False
+            t_rate_os = srv_rating
+            t_rate_internal = f_rating_internal
+            final_f_rate_mtime = db_state['file_rating_mtime']
+            final_s_rate_mtime = db_state['server_rating_mtime']
+        
         # 2. ЛАЙК
         db_srv_star = db_state['server_starred']
         db_f_star = db_state['file_starred']
@@ -261,6 +269,13 @@ class SyncAgent:
         write_file = (w_file_star or w_file_rate) and self.sync_mode in ['two-way', 'server-to-file']
         write_server = (w_srv_star or w_srv_rate) and self.sync_mode in ['two-way', 'file-to-server']
 
+        # ОТКЛЮЧЕНИЕ СИНХРОНИЗАЦИИ ЛАЙКОВ
+        if not self.config.get('sync_likes', True):
+            w_file_star, w_srv_star = False, False
+            t_star = srv_starred
+            final_f_star_mtime = db_state['file_starred_mtime']
+            final_s_star_mtime = db_state['server_starred_mtime']
+        
         # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (С учетом блокировки режима) ---
         if not write_file and not write_server:
             if not self.config.get('dry_run', False):
@@ -276,7 +291,15 @@ class SyncAgent:
                     final_s_star = t_star
                     final_f_rate = t_rate_internal
                     final_s_rate = t_rate_os
-                
+
+                # ОТКЛЮЧЕНИЕ СИНХРОНИЗАЦИИ (СОХРАНЕНИЕ ДАННЫХ В БД)
+                if not self.config.get('sync_ratings', True):
+                    final_f_rate = db_state['file_rating']
+                    final_s_rate = db_state['server_rating']
+                if not self.config.get('sync_likes', True):
+                    final_f_star = db_state['file_starred']
+                    final_s_star = db_state['server_starred']
+
                 upsert_track_state(
                     song_id=song_id, file_path=file_path, mtime_ns=current_mtime,
                     f_starred=final_f_star, f_rating=final_f_rate,
@@ -372,12 +395,14 @@ class SyncAgent:
         upsert_track_state(
             song_id=song_id, file_path=file_path, mtime_ns=current_mtime,
             # ИЗМЕНЕНИЕ: Записываем новые значения в БД только если запись на диск была запрошена И успешна (actual_f_rate_write / actual_f_star_write)
-            f_starred=t_star if (w_file_star and actual_f_star_write) else f_starred, 
-            f_rating=t_rate_internal if (w_file_rate and actual_f_rate_write) else f_rating_internal,
-            s_starred=t_star if actual_srv_write else srv_starred, 
-            s_rating=t_rate_os if actual_srv_write else srv_rating,
-            f_rate_mtime=actual_f_rate_mtime, s_rate_mtime=actual_s_rate_mtime,
-            f_star_mtime=actual_f_star_mtime, s_star_mtime=actual_s_star_mtime
+            f_starred=(t_star if (w_file_star and actual_f_star_write) else f_starred) if self.config.get('sync_likes', True) else db_state['file_starred'], 
+            f_rating=(t_rate_internal if (w_file_rate and actual_f_rate_write) else f_rating_internal) if self.config.get('sync_ratings', True) else db_state['file_rating'],
+            s_starred=(t_star if actual_srv_write else srv_starred) if self.config.get('sync_likes', True) else db_state['server_starred'], 
+            s_rating=(t_rate_os if actual_srv_write else srv_rating) if self.config.get('sync_ratings', True) else db_state['server_rating'],
+            f_rate_mtime=actual_f_rate_mtime if self.config.get('sync_ratings', True) else db_state['file_rating_mtime'], 
+            s_rate_mtime=actual_s_rate_mtime if self.config.get('sync_ratings', True) else db_state['server_rating_mtime'],
+            f_star_mtime=actual_f_star_mtime if self.config.get('sync_likes', True) else db_state['file_starred_mtime'], 
+            s_star_mtime=actual_s_star_mtime if self.config.get('sync_likes', True) else db_state['server_starred_mtime']
         )
         # ИЗМЕНЕНИЕ: Возвращаем объединенный флаг файловой записи и флаг серверной записи
         return (actual_f_rate_write or actual_f_star_write), actual_srv_write
