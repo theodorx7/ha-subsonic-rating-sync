@@ -12,8 +12,3 @@ Supported sync modes:
   - two-way (merge)
   - one-way (files → Navidrome) or (Navidrome → files)
 
-  
-    Важно по настройке опции music_folder:
-
-         Для Navidrome: Убедитесь, что в настройках вашего плеера/агента в Navidrome включена опция "Показать реальный путь" (Report Full Path). При включенной опции поле music_folder в настройках аддона можно оставить пустым.
-         С серверами Airsonic, Gonic и других Subsonic-серверов: Эти серверы отдают путь к файлам относительно корня библиотеки. Вам обязательно нужно указать в поле music_folder путь, по которому ваша музыка примонтирована в Home Assistant (например, /media/music).
