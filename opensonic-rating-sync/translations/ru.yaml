@@ -1,16 +1,16 @@
 configuration:
   server_protocol:
     name: Server protocol
-    description: Базовый URL вашего Navidrome/Subsonic сервера.
+    description:
   server_host:
     name: Server URL
-    description: Базовый URL вашего Navidrome/Subsonic сервера.
+    description:
   server_port:
     name: Server port
-    description: Базовый URL сервера Navidrome/Subsonic.
+    description:
   user:
     name: User
-    description: Имя пользователя для API-доступа.
+    description:
   password:
     name: Password
     description:
@@ -22,7 +22,7 @@ configuration:
     description: Применяется только, если включен двухсторонний режим синхронизации.
   dry_run:
     name: Dry run
-    description: Только имитация без записи изменений.
+    description: Только имитация без записи изменений в файлы/сервер.
   debug:
     name: Debug
     description: Подробное логирование.
