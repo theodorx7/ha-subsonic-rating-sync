@@ -12,7 +12,7 @@ from .database import init_db
 OPTIONS_PATH = Path(os.environ.get("OPTIONS_PATH", "/data/options.json"))
 
 def setup_logging(debug: bool):
-    """Инициализация логгера для HA App. Вывод идет в stdout."""
+    """Initializes the logger for HA App. Output goes to stdout."""
     level = logging.DEBUG if debug else logging.INFO
     
     logger = logging.getLogger()
