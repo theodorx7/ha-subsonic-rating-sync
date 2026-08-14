@@ -125,13 +125,11 @@ class SyncAgent:
         # ОПТИМИЗАЦИЯ: Сервер отдает точную дату УСТАНОВКИ лайка (ISO 8601). Парсим её.
         # Если лайк снят (srv_starred == 0), дату снятия API не отдает, используем time.time().
         if srv_starred == 1 and song.starred:
-            logger.debug(f"ID {song_id} | Raw 'song.starred' value: {repr(song.starred)} (Type: {type(song.starred)})")
             try:
                 # Заменяем 'Z' на '+00:00' для совместимости со всеми версиями Python
                 srv_star_dt = datetime.datetime.fromisoformat(str(song.starred).replace('Z', '+00:00'))
                 srv_star_mtime_val = srv_star_dt.timestamp()
             except Exception:
-                logger.warning(f"ID {song_id} | Failed to parse 'song.starred' value: {repr(song.starred)}. Error: {e}")
                 srv_star_mtime_val = time.time()
         else:
             srv_star_mtime_val = time.time()
