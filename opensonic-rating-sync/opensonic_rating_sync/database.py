@@ -50,29 +50,15 @@ def upsert_track_state(song_id: str, file_path: str, mtime_ns: int,
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         
-        # 1. Предотвращение конфликта по file_path (Очистка призраков)
-        cursor.execute("DELETE FROM tracks_state WHERE file_path = ? AND song_id != ?", (file_path, song_id))
-        
-        # 2. Атомарный UPSERT по song_id
+        # ОПТИМИЗАЦИЯ: Замена двух запросов (DELETE призраков + UPSERT) на один INSERT OR REPLACE.
+        # SQLite автоматически удалит строку с конфликтующим file_path (призрак) или song_id, а затем вставит новую строку с актуальными данными за одну атомарную операцию.
         cursor.execute("""
-            INSERT INTO tracks_state (
+            INSERT OR REPLACE INTO tracks_state (
                 song_id, file_path, file_mtime_ns, file_starred, file_rating, 
                 server_starred, server_rating, file_rating_mtime, server_rating_mtime, 
                 file_starred_mtime, server_starred_mtime, last_sync_time
             ) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(song_id) DO UPDATE SET 
-                file_path = excluded.file_path, 
-                file_mtime_ns = excluded.file_mtime_ns, 
-                file_starred = excluded.file_starred, 
-                file_rating = excluded.file_rating, 
-                server_starred = excluded.server_starred, 
-                server_rating = excluded.server_rating, 
-                file_rating_mtime = excluded.file_rating_mtime, 
-                server_rating_mtime = excluded.server_rating_mtime, 
-                file_starred_mtime = excluded.file_starred_mtime, 
-                server_starred_mtime = excluded.server_starred_mtime,
-                last_sync_time = CURRENT_TIMESTAMP
         """, (song_id, file_path, mtime_ns, f_starred, f_rating, s_starred, s_rating,
               f_rate_mtime, s_rate_mtime, f_star_mtime, s_star_mtime))
             
