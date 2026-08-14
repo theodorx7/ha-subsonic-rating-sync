@@ -19,7 +19,7 @@ configuration:
     description: Периодичность синхронизации.
   conflict_resolution:
     name: Conflict resolution
-    description: Стратегия разрешения конфликтов при двусторонней синхронизации.
+    description: Применяется только, если включен двухсторонний режим синхронизации.
   dry_run:
     name: Dry run
     description: Только имитация без записи изменений.
