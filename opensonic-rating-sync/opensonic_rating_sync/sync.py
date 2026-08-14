@@ -88,7 +88,7 @@ class SyncAgent:
                 offset += count_per_request
         except Exception as e:
             logger.error(f"Error fetching tracks (search3): {e}", exc_info=True)
-            raise SystemExit(1)
+            return [] 
         return songs
 
     def _get_action_str(self, w_star, w_rate, star_val, rate_val):
