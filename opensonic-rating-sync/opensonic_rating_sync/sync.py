@@ -229,7 +229,7 @@ class SyncAgent:
                 final_f_rate_mtime = 0
                 final_s_rate_mtime = 0
                 is_rating_unresolved = True
-                logger.warning(f"{prefix}ID {song_id} — ⚠️ Конфликт рейтингов: Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★ ({self._track_label(song, file_path)}). Решение: измените оценку вручную в одном из мест и перезапустите синхронизацию, либо временно используйте односторонний режим, чтобы принудительно перезаписать оценку на одной из сторон.")
+                logger.warning(f"{prefix}ID {song_id} — ⚠️ Rating conflict: Server={srv_rating}★, File={f_rating_5_scale:g}★ ({self._track_label(song, file_path)}). Solution: manually change the rating in one of the locations and restart the sync, or temporarily use one-way mode to force overwrite the rating on one of the sides.")
 
         # ОТКЛЮЧЕНИЕ СИНХРОНИЗАЦИИ РЕЙТИНГОВ
         if not self.config.get('sync_ratings', True):
