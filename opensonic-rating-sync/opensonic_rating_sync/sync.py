@@ -110,8 +110,8 @@ class SyncAgent:
         # 2. Изменился только файл
         if not srv_changed and f_changed: return 'file', f_mtime
         
-        # 3. Никто не менялся ИЛИ изменились оба (логика разрешения одинакова)
-        if srv_val == f_val: return 'none', max(srv_mtime, f_mtime)
+        # 3. Изменились оба ИЛИ никто не менялся.
+        # ОПТИМИЗАЦИЯ: Проверка "if srv_val == f_val" удалена, так как этот метод вызывается только при несовпадении значений файла и сервера (входные фильтры в _process_song).
         # Стабильная дивергенция! Если меток времени нет (0) - ждет пользователя
         if f_mtime == 0 and srv_mtime == 0: return 'unresolved', 0
         if f_mtime > srv_mtime: return 'file', f_mtime
@@ -152,7 +152,10 @@ class SyncAgent:
             )
             raise SystemExit(1)
     
-        if not os.path.exists(file_path):
+        # Один вызов os.stat вместо os.path.exists + os.stat для I/O оптимизации.
+        try:
+            current_mtime = os.stat(file_path).st_mtime_ns
+        except FileNotFoundError:
             logger.warning(f"File not found on disk:: {file_path} (Track on server: {self._track_label(song)})")
             return False, False
 
