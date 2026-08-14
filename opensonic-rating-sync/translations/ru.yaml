@@ -21,8 +21,8 @@ configuration:
     name: Conflict resolution
     description: Применяется только, если включен двухсторонний режим синхронизации.
   dry_run:
-    name: Dry run
-    description: Только имитация без записи изменений в файлы/сервер.
+    name: DRY RUN
+    description: Режим имитации синхронизации без применения каких-либо изменений в файлах или на сервере.
   debug:
     name: Debug
     description: Подробное логирование.
