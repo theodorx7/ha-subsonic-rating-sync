@@ -19,7 +19,7 @@ _WMA_RATING_WRITE_MAP = {0: 0, 1: 1, 2: 1, 3: 25, 4: 25, 5: 50, 6: 50, 7: 75, 8:
 _WMA_RATING_READ_MAP = {0: 0, 1: 2, 25: 4, 50: 6, 75: 8, 99: 10}
 _KNOWN_PRIMARY_RATING_PLAYERS = ["MusicBee", "no@email"]
 _RATING_EMAIL = "no@email"
-# --- Теги лайка в формате MusicBee ---
+# --- Like tags in MusicBee format ---
 _LIKE_TAG = "LOVE RATING"
 _LIKE_TAG_ASF = "musicbee/LOVE RATING"
 _LIKE_TAG_MP4 = "----:com.apple.iTunes:LOVERATING"
@@ -27,7 +27,7 @@ _LIKE_VALUE_ON = "L"
 _LIKE_VALUE_OFF = "0"
 _LIKE_VALUE_BAN = "B"
 
-# --- БАЗОВЫЙ КЛАСС СТРАТЕГИИ ---
+# --- BASE STRATEGY CLASS ---
 class RatingHandler:
     def read_all(self, file_path: str): raise NotImplementedError
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple: raise NotImplementedError
@@ -35,7 +35,7 @@ class RatingHandler:
 
     def _safe_save(self, audio, file_path: str, atomic_save: bool = False):
         if atomic_save:
-            # --- АТОМАРНЫЙ РЕЖИМ (Copy-Save-Replace) ---
+            # --- ATOMIC MODE (Copy-Save-Replace) ---
             # 100% защита от бинарной порчи при гонках и сбоях питания (для SMB/сети).
             dir_name = os.path.dirname(file_path)
             # Создаем временный файл в той же директории
@@ -50,7 +50,7 @@ class RatingHandler:
                 # 2. Сохраняем измененные теги во временный файл (mutagen перепишет теги в копии, не трогая аудио)
                 audio.save(tmp_path)
     
-                # --- ЗАЩИТА ОТ ПОТЕРИ ПИТАНИЯ ---
+                # --- POWER LOSS PROTECTION ---
                 # Принудительно сбрасываем буферы ОС на физический диск
                 with open(tmp_path, 'r+b') as f:
                     os.fsync(f.fileno())
@@ -64,16 +64,14 @@ class RatingHandler:
                 raise # Пробрасываем ошибку дальше, чтобы сработал try-except в вызывающем методе
 
         else:
-            # --- ШТАТНЫЙ РЕЖИМ (In-place) ---
-            # Прямая запись тегов в файл.
+            # --- STANDARD WRITE MODE (In-place) ---
             audio.save(file_path)
             
-            # --- ЗАЩИТА ОТ ПОТЕРИ ПИТАНИЯ ---
-            # Принудительно сбрасываем буферы ОС на физический диск
+            # --- POWER LOSS PROTECTION ---
             with open(file_path, 'r+b') as f:
                 os.fsync(f.fileno())
 
-# --- КОНВЕРСИИ POPM ---
+# --- POPM CONVERSIONS ---
 def _popm_rating_to_internal(popm_rating, email=None):
     if popm_rating == 0 or popm_rating is None: return None
     if email in _KNOWN_PRIMARY_RATING_PLAYERS:
@@ -92,11 +90,12 @@ def _internal_rating_to_popm(internal_rating):
     if internal_rating == 0 or internal_rating is None: return 0
     return _PRIMARY_MP3_RATING_MAP.get(internal_rating, 0)
 
-# --- СТРАТЕГИИ ID3 (MP3 / AIFF /WAV ) ---
+# --- ID3 STRATEGIES (MP3 / AIFF /WAV ) ---
 class ID3Handler(RatingHandler):
-    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
+    # Read rating and like at once
     def read_all(self, file_path: str):
         try:
+            # PROTECTION: If the file has no tags at all, initialize an empty dictionary
             audio = self._load(file_path)
             if not audio or not audio.tags:
                 return None, 0
@@ -104,7 +103,7 @@ class ID3Handler(RatingHandler):
             rating = None
             starred = 0
             
-            # --- ЧТЕНИЕ РЕЙТИНГА ---
+            # --- READ RATING ---
             popm_frames = audio.tags.getall("POPM")
             if popm_frames:
                 try:
@@ -124,7 +123,7 @@ class ID3Handler(RatingHandler):
                     logger.error(f"ID3 rating parse err ({file_path}): {e} | Raw: {popm_frames}")
                     rating = None
             
-            # --- ЧТЕНИЕ ЛАЙКА ---
+            # --- READ LIKE ---
             like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG}")
             if like_frames:
                 try:
@@ -146,7 +145,7 @@ class ID3Handler(RatingHandler):
         r_status = None
         s_status = None
 
-        # --- ЗАПИСЬ РЕЙТИНГА ---
+        # --- WRITE RATING ---
         if rating is not None:
             try:
                 # Конвертируем рейтинг (даже если это 0) в шкалу POPM
@@ -170,7 +169,7 @@ class ID3Handler(RatingHandler):
             else:
                 r_status = True
         
-        # --- ЗАПИСЬ ЛАЙКА ---
+        # --- WRITE LIKE ---
         if starred is not None:
             try:
                 value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
@@ -181,7 +180,7 @@ class ID3Handler(RatingHandler):
             else:
                 s_status = True
         
-        # --- Запись в файл ---
+        # --- WRITE TO FILE ---
         try:
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
@@ -201,9 +200,9 @@ class AIFFHandler(ID3Handler):
 class WAVHandler(ID3Handler):
     def _load(self, file_path): return WAVE(file_path)
 
-# --- СТРАТЕГИЯ XIPH (FLAC, OGG, OPUS, APE, WavPack) ---
+# --- XIPH STRATEGIES (FLAC, OGG, OPUS, APE, WavPack) ---
 class XiphHandler(RatingHandler):
-    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
+    # Read rating and like at once
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
@@ -213,7 +212,7 @@ class XiphHandler(RatingHandler):
             rating = None
             starred = 0
             
-            # --- ЧТЕНИЕ РЕЙТИНГА ---
+            # --- READ RATING ---
             rating_raw = audio.get("RATING")
             if rating_raw:
                 try:
@@ -228,7 +227,7 @@ class XiphHandler(RatingHandler):
                     logger.error(f"Xiph rating parse err ({file_path}): {e} | Raw: {rating_raw}")
                     rating = None
             
-            # --- ЧТЕНИЕ ЛАЙКА ---
+            # --- READ LIKE ---
             like_raw = audio.get(_LIKE_TAG)
             if like_raw:
                 try:
@@ -244,21 +243,18 @@ class XiphHandler(RatingHandler):
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
         audio = self._load(file_path)
         if audio:
-            # ЗАЩИТА: Если файл совсем без тегов, инициализируем пустой словарь
             if audio.tags is None:
                 audio.add_tags()
 
             r_status = None
             s_status = None
 
-            # --- ЗАПИСЬ РЕЙТИНГА ---
+            # --- WRITE RATING ---
             if rating is not None:
                 try:
                     if rating > 0:
-                        # Перезаписывает тег, если он есть, или создает новый
                         audio["RATING"] = str(max(10, min(100, rating * 10)))
                     else:
-                        # Рейтинг 0 — удаляем тег, если он физически существует
                         if "RATING" in audio:
                             del audio["RATING"]
                 except Exception as e:
@@ -267,7 +263,7 @@ class XiphHandler(RatingHandler):
                 else:
                     r_status = True
             
-            # --- ЗАПИСЬ ЛАЙКА ---
+            # --- WRITE LIKE ---
             if starred is not None:
                 try:
                     audio[_LIKE_TAG] = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
@@ -277,7 +273,7 @@ class XiphHandler(RatingHandler):
                 else:
                     s_status = True
 
-            # --- Запись в файл ---
+            # --- WRITE TO FILE ---
             try:
                 self._safe_save(audio, file_path, atomic_save)
             except Exception as e: 
@@ -292,9 +288,9 @@ class XiphHandler(RatingHandler):
 
     def _load(self, file_path): return MutagenFile(file_path)
 
-# --- СТРАТЕГИЯ MP4 (M4A / AAC) ---
+# --- MP4 STRATEGIES (M4A / AAC) ---
 class MP4Handler(RatingHandler):
-    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
+    # Read rating and like at once
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
@@ -304,7 +300,7 @@ class MP4Handler(RatingHandler):
             rating = None
             starred = 0
             
-            # --- ЧТЕНИЕ РЕЙТИНГА M4A ---
+            # --- READ RATING M4A ---
             rating_raw = audio.tags.get("rate")
             if rating_raw:
                 try:
@@ -315,7 +311,7 @@ class MP4Handler(RatingHandler):
                     logger.error(f"MP4 rating parse err ({file_path}): {e} | Raw: {rating_raw}")
                     rating = None 
             
-            # --- ЧТЕНИЕ ЛАЙКА M4A ---
+            # --- READ LIKE M4A ---
             like_raw = audio.tags.get(_LIKE_TAG_MP4)
             if like_raw:
                 try:
@@ -336,16 +332,14 @@ class MP4Handler(RatingHandler):
         r_status = None
         s_status = None
 
-        # --- ЗАПИСЬ РЕЙТИНГА M4A ---
+        # --- WRITE RATING M4A ---
         if rating is not None:
             try:
                 if rating > 0:
                     m4a_rating = str(max(10, min(100, rating * 10)))
-                    # ИСПРАВЛЕНО: Передаем строку (str), а не байты! 
-                    # Для коротких атомов (как "rate") Mutagen ожидает str, чтобы записать как текст.
+                    # Passing a string (str), not bytes. For short atoms (like "rate"), Mutagen expects a str to write it as text.
                     audio["rate"] = [m4a_rating]
                 else:
-                    # Рейтинг 0 — удаляем короткий атом "rate"
                     if "rate" in audio.tags:
                         del audio.tags["rate"]
             except Exception as e:
@@ -354,7 +348,7 @@ class MP4Handler(RatingHandler):
             else:
                 r_status = True
 
-        # --- ЗАПИСЬ ЛАЙКА M4A ---
+        # --- WRITE LIKE M4A ---
         if starred is not None:
             try:
                 value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
@@ -365,7 +359,7 @@ class MP4Handler(RatingHandler):
             else:
                 s_status = True
 
-        # --- Запись в файл ---
+        # --- WRITE TO FILE ---
         try:
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
@@ -378,9 +372,9 @@ class MP4Handler(RatingHandler):
 
     def _load(self, file_path): return MP4(file_path)
 
-# --- СТРАТЕГИЯ WMA (Windows Media Audio / ASF) ---
+# --- WMA STRATEGIES (Windows Media Audio / ASF) ---
 class ASFHandler(RatingHandler):
-    # ОПТИМИЗАЦИЯ: Чтение рейтинга и лайка за один раз
+    # Read rating and like at once
     def read_all(self, file_path: str):
         try:
             audio = self._load(file_path)
@@ -390,7 +384,7 @@ class ASFHandler(RatingHandler):
             rating = None
             starred = 0
             
-            # --- ЧТЕНИЕ РЕЙТИНГА ---
+            # --- READ RATING ---
             rating_raw = audio.tags.get("WM/SharedUserRating")
             if rating_raw:
                 try:
@@ -401,7 +395,7 @@ class ASFHandler(RatingHandler):
                     logger.error(f"ASF rating parse err ({file_path}): {e} | Raw: {rating_raw}")
                     rating = None
             
-            # --- ЧТЕНИЕ ЛАЙКА ---
+            # --- READ LIKE ---
             like_raw = audio.tags.get(_LIKE_TAG_ASF)
             if like_raw:
                 try:
@@ -422,15 +416,13 @@ class ASFHandler(RatingHandler):
         r_status = None
         s_status = None
         
-        # --- ЗАПИСЬ РЕЙТИНГА ---
+        # --- WRITE RATING ---
         if rating is not None:
             try:
                 if rating > 0:
                     wma_rating = _WMA_RATING_WRITE_MAP.get(rating, 0)
-                    # Перезаписывает атрибут, если он есть, или создает новый
                     audio.tags["WM/SharedUserRating"] = ASFDWordAttribute(wma_rating)
                 else:
-                    # Рейтинг 0 — удаляем атрибут по точному ключу, если он существует
                     if "WM/SharedUserRating" in audio.tags:
                         del audio.tags["WM/SharedUserRating"]
             except Exception as e:
@@ -439,7 +431,7 @@ class ASFHandler(RatingHandler):
             else:
                 r_status = True
             
-        # --- ЗАПИСЬ ЛАЙКА ---
+        # --- WRITE LIKE ---
         if starred is not None:
             try:
                 value = _LIKE_VALUE_ON if starred else _LIKE_VALUE_OFF
@@ -450,7 +442,7 @@ class ASFHandler(RatingHandler):
             else:
                 s_status = True
 
-        # --- Запись в файл ---
+        # --- WRITE TO FILE ---
         try:
             self._safe_save(audio, file_path, atomic_save)
         except Exception as e: 
