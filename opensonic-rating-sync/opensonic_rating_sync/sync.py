@@ -159,7 +159,6 @@ class SyncAgent:
             logger.warning(f"File not found on disk:: {file_path} (Track on server: {self._track_label(song)})")
             return False, False
 
-        current_mtime = os.stat(file_path).st_mtime_ns
         db_state = get_track_state(song_id) or {
             'file_mtime_ns': 0, 'file_starred': 0, 'file_rating': 0,
             'server_starred': 0, 'server_rating': 0,
