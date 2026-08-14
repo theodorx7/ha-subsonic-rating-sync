@@ -28,6 +28,8 @@ options:
   sync_schedule_type: "off"
   sync_interval_hours: 1
   sync_time: "04:00:00"
+  sync_ratings: true
+  sync_likes: true
   atomic_save: false
   debug: true
 schema:
@@ -43,6 +45,8 @@ schema:
   sync_schedule_type: list(off|interval|daily)
   sync_interval_hours: int?
   sync_time: str?
+  sync_ratings: bool
+  sync_likes: bool
   atomic_save: bool
   debug: bool
   
