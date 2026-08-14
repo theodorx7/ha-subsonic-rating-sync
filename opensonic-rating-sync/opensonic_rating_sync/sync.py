@@ -200,8 +200,8 @@ class SyncAgent:
             srv_changed = (srv_rating != db_srv_rating)
             f_changed = (f_rating_internal != db_f_rating)
             
-            new_f_rate_mtime = now_time if f_changed else db_state['file_rating_mtime']
-            new_s_rate_mtime = now_time if srv_changed else db_state['server_rating_mtime']
+            new_f_rate_mtime = now_time if (f_changed and not is_new_file) else db_state['file_rating_mtime']
+            new_s_rate_mtime = now_time if (srv_changed and not is_new_file) else db_state['server_rating_mtime']
             
             winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
             
