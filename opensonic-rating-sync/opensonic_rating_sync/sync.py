@@ -2,6 +2,7 @@ import os
 import logging
 import math
 import time
+import datetime
 from urllib.parse import unquote
 from .database import get_track_state, upsert_track_state
 from . import ratings
@@ -121,6 +122,18 @@ class SyncAgent:
         song_id = song.id
         # Читаем лайк напрямую из ответа search3 (как и рейтинг), без отдельного списка
         srv_starred = 1 if song.starred else 0
+        # ОПТИМИЗАЦИЯ: Сервер отдает точную дату УСТАНОВКИ лайка (ISO 8601). Парсим её.
+        # Если лайк снят (srv_starred == 0), дату снятия API не отдает, используем time.time().
+        if srv_starred == 1 and song.starred:
+            try:
+                # Заменяем 'Z' на '+00:00' для совместимости со всеми версиями Python
+                srv_star_dt = datetime.datetime.fromisoformat(str(song.starred).replace('Z', '+00:00'))
+                srv_star_mtime_val = srv_star_dt.timestamp()
+            except Exception:
+                srv_star_mtime_val = time.time()
+        else:
+            srv_star_mtime_val = time.time()
+
         # ИСПРАВЛЕНИЕ: Жестко приводим к int, чтобы избежать TypeError при делении
         srv_rating = int(song.user_rating or 0)
     
@@ -222,7 +235,8 @@ class SyncAgent:
         f_star_changed = (f_starred != db_f_star)
         
         new_f_star_mtime = now_time if f_star_changed else db_state['file_starred_mtime']
-        new_s_star_mtime = now_time if srv_star_changed else db_state['server_starred_mtime']
+        # ИЗМЕНЕНИЕ: Используем распарсенную дату установки лайка с сервера (если он изменился)
+        new_s_star_mtime = srv_star_mtime_val if srv_star_changed else db_state['server_starred_mtime']
         
         # ОПТИМИЗАЦИЯ ДЛЯ БИНАРНОГО ЗНАЧЕНИЯ: Если значения уже равны, нет смысла вычислять победителя
         if srv_starred == f_starred:
