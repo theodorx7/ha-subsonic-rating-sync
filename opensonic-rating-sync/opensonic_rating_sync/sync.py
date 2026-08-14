@@ -238,6 +238,7 @@ class SyncAgent:
             t_rate_internal = f_rating_internal
             final_f_rate_mtime = db_state['file_rating_mtime']
             final_s_rate_mtime = db_state['server_rating_mtime']
+            is_rating_unresolved = False
         
         # 2. ЛАЙК
         db_srv_star = db_state['server_starred']
