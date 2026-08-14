@@ -1,6 +1,5 @@
 FROM ghcr.io/home-assistant/base:latest
 
-# Устанавливаем Python, временно ставим pip, ставим пакеты, удаляем pip
 RUN apk add --no-cache python3 \
     && apk add --no-cache --virtual .build-deps py3-pip \
     && pip install --no-cache-dir --break-system-packages \
@@ -10,7 +9,6 @@ RUN apk add --no-cache python3 \
 
 WORKDIR /app
 
-# Копируем пакет Python и run-скрипт
 COPY opensonic_rating_sync/ ./opensonic_rating_sync/
 COPY run.sh /
 RUN chmod a+x /run.sh
