@@ -28,8 +28,8 @@ def setup_logging(debug: bool):
         _COLORS = {
             logging.INFO: "\033[32m",     # GREEN
             logging.WARNING: "\033[33m",  # YELLOW
-            logging.ERROR: "\033[35m",    # MAGENTA
-            logging.CRITICAL: "\033[31m", # RED
+            logging.ERROR: "\033[31m",    # RED 
+            logging.CRITICAL: "\033[35m", # MAGENTA
         }
         _RESET = "\033[0m"
         
