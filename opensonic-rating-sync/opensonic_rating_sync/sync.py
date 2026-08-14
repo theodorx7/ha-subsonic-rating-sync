@@ -223,11 +223,6 @@ class SyncAgent:
                 final_s_rate_mtime = 0
                 if is_new_file:
                     logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
-            else:
-                t_rate_os = srv_rating
-                t_rate_internal = f_rating_internal or (srv_rating * 2)
-                w_file_rate, w_srv_rate = False, False
-                final_f_rate_mtime, final_s_rate_mtime = new_f_rate_mtime, new_s_rate_mtime
 
         # 2. ЛАЙК
         db_srv_star = db_state['server_starred']
