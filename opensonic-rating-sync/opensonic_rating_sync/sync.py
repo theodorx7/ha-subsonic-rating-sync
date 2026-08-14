@@ -167,7 +167,11 @@ class SyncAgent:
         }
         # ОПТИМИЗАЦИЯ: Читаем теги с диска только если изменилось время файла (mtime)
         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
-            f_rating_internal, f_starred = ratings.get_all_ratings_from_file(file_path)
+            f_rating_internal, f_starred = ratings.get_all_ratings_from_file(
+                file_path, 
+                self.config.get('sync_ratings', True), 
+                self.config.get('sync_likes', True)
+            )
             logger.debug(f"READ FROM FILE: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred}")
         else:
             # Берем сохраненные значения из БД (гарантированно числа, None быть не может)
