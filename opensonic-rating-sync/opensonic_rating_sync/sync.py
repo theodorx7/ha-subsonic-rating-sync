@@ -254,13 +254,6 @@ class SyncAgent:
             t_star = f_starred
             w_file_star, w_srv_star = False, True
             final_f_star_mtime, final_s_star_mtime = win_star_mtime, win_star_mtime
-        elif star_winner == 'unresolved':
-            t_star = srv_starred
-            w_file_star, w_srv_star = False, False
-            final_f_star_mtime = 0
-            final_s_star_mtime = 0
-            if is_new_file:
-                logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ ЛАЙКОВ (Нет данных о времени): Сервер={srv_starred}, Файл={f_starred}. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
         else:
             t_star = srv_starred
             w_file_star, w_srv_star = False, False
