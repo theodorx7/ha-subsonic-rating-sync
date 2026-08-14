@@ -211,6 +211,13 @@ class SyncAgent:
             new_s_rate_mtime = now_time if (srv_changed and not is_new_file) else db_state['server_rating_mtime']
             
             winner, win_mtime = self._resolve_lww(srv_rating, f_rating_internal, db_srv_rating, db_f_rating, new_s_rate_mtime, new_f_rate_mtime)
+            # Односторонняя синхронизация при первом запуске (unresolved):
+            # Главная сторона принудительно становится победителем, чтобы затереть данные на другой стороне.
+            if winner == 'unresolved':
+                if self.sync_mode == 'file-to-server':
+                    winner, win_mtime = 'file', now_time
+                elif self.sync_mode == 'server-to-file':
+                    winner, win_mtime = 'server', now_time
             
             if winner == 'server':
                 t_rate_os = srv_rating
