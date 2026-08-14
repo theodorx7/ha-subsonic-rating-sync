@@ -62,6 +62,8 @@ def load_config() -> dict:
         "sync_interval_hours":  int(raw.get("sync_interval_hours") or 0),
         "sync_time":            str(raw.get("sync_time") or "").strip(),
         "dry_run":              bool(raw.get("dry_run", False)),
+        "sync_ratings":          bool(raw.get("sync_ratings", True)),
+        "sync_likes":            bool(raw.get("sync_likes", True)),
         "atomic_save":          bool(raw.get("atomic_save", False)),
         "debug":                bool(raw.get("debug", False)),
     }
