@@ -29,7 +29,7 @@ _LIKE_VALUE_BAN = "B"
 
 # --- BASE STRATEGY CLASS ---
 class RatingHandler:
-    def read_all(self, file_path: str): raise NotImplementedError
+    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True): raise NotImplementedError
     def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple: raise NotImplementedError
     def _load(self, file_path: str): raise NotImplementedError
 
@@ -92,7 +92,7 @@ def _internal_rating_to_popm(internal_rating):
 # --- ID3 STRATEGIES (MP3 / AIFF /WAV ) ---
 class ID3Handler(RatingHandler):
     # Read rating and like at once
-    def read_all(self, file_path: str):
+    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
         try:
             # PROTECTION: If the file has no tags at all, initialize an empty dictionary
             audio = self._load(file_path)
@@ -103,7 +103,7 @@ class ID3Handler(RatingHandler):
             starred = 0
             
             # --- READ RATING ---
-            popm_frames = audio.tags.getall("POPM")
+            popm_frames = audio.tags.getall("POPM") if sync_ratings else []
             if popm_frames:
                 try:
                     selected_popm = None
@@ -123,7 +123,7 @@ class ID3Handler(RatingHandler):
                     rating = None
             
             # --- READ LIKE ---
-            like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG}")
+            like_frames = audio.tags.getall(f"TXXX:{_LIKE_TAG}") if sync_likes else []
             if like_frames:
                 try:
                     val_raw = like_frames[0].text[0]
@@ -202,7 +202,7 @@ class WAVHandler(ID3Handler):
 # --- XIPH STRATEGIES (FLAC, OGG, OPUS, APE, WavPack) ---
 class XiphHandler(RatingHandler):
     # Read rating and like at once
-    def read_all(self, file_path: str):
+    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
         try:
             audio = self._load(file_path)
             if not audio or not audio.tags:
@@ -212,7 +212,7 @@ class XiphHandler(RatingHandler):
             starred = 0
             
             # --- READ RATING ---
-            rating_raw = audio.get("RATING")
+            rating_raw = audio.get("RATING") if sync_ratings else None
             if rating_raw:
                 try:
                      # 1. str() is needed to process the APETextValue object from APE/WavPack
@@ -227,7 +227,7 @@ class XiphHandler(RatingHandler):
                     rating = None
             
             # --- READ LIKE ---
-            like_raw = audio.get(_LIKE_TAG)
+            like_raw = audio.get(_LIKE_TAG) if sync_likes else None
             if like_raw:
                 try:
                     starred = 1 if like_raw[0] == _LIKE_VALUE_ON else 0
@@ -290,7 +290,7 @@ class XiphHandler(RatingHandler):
 # --- MP4 STRATEGIES (M4A / AAC) ---
 class MP4Handler(RatingHandler):
     # Read rating and like at once
-    def read_all(self, file_path: str):
+    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
         try:
             audio = self._load(file_path)
             if not audio or not audio.tags:
@@ -300,7 +300,7 @@ class MP4Handler(RatingHandler):
             starred = 0
             
             # --- READ RATING M4A ---
-            rating_raw = audio.tags.get("rate")
+            rating_raw = audio.tags.get("rate") if sync_ratings else None
             if rating_raw:
                 try:
                     m4a_rating = int(rating_raw[0] if isinstance(rating_raw, list) else rating_raw)
@@ -311,7 +311,7 @@ class MP4Handler(RatingHandler):
                     rating = None 
             
             # --- READ LIKE M4A ---
-            like_raw = audio.tags.get(_LIKE_TAG_MP4)
+            like_raw = audio.tags.get(_LIKE_TAG_MP4) if sync_likes else None
             if like_raw:
                 try:
                     starred = 1 if like_raw[0].decode('utf-8') == _LIKE_VALUE_ON else 0
@@ -374,7 +374,7 @@ class MP4Handler(RatingHandler):
 # --- WMA STRATEGIES (Windows Media Audio / ASF) ---
 class ASFHandler(RatingHandler):
     # Read rating and like at once
-    def read_all(self, file_path: str):
+    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
         try:
             audio = self._load(file_path)
             if not audio or not audio.tags:
@@ -384,7 +384,7 @@ class ASFHandler(RatingHandler):
             starred = 0
             
             # --- READ RATING ---
-            rating_raw = audio.tags.get("WM/SharedUserRating")
+            rating_raw = audio.tags.get("WM/SharedUserRating") if sync_ratings else None
             if rating_raw:
                 try:
                     wma_rating = rating_raw[0].value
@@ -395,7 +395,7 @@ class ASFHandler(RatingHandler):
                     rating = None
             
             # --- READ LIKE ---
-            like_raw = audio.tags.get(_LIKE_TAG_ASF)
+            like_raw = audio.tags.get(_LIKE_TAG_ASF) if sync_likes else None
             if like_raw:
                 try:
                     starred = 1 if like_raw[0].value == _LIKE_VALUE_ON else 0
@@ -471,6 +471,6 @@ def set_tags_to_file(file_path: str, rating: int | None = None, starred: bool | 
         return handler.write_tags(file_path, rating, starred, atomic_save)
     return None, None
 
-def get_all_ratings_from_file(file_path: str):
+def get_all_ratings_from_file(file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
     handler = get_handler(file_path)
-    return handler.read_all(file_path) if handler else (None, 0)
+    return handler.read_all(file_path, sync_ratings, sync_likes) if handler else (None, 0)
