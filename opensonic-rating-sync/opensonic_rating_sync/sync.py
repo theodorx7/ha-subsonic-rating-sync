@@ -226,7 +226,7 @@ class SyncAgent:
                 final_f_rate_mtime = 0
                 final_s_rate_mtime = 0
                 if is_new_file:
-                    logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест. ({self._track_label(song, file_path)})")
+                    logger.warning(f"{prefix}ID {song_id} — ⚠️ КОНФЛИКТ РЕЙТИНГА (Нет данных о времени): Сервер={srv_rating}★, Файл={f_rating_5_scale:g}★. Измените оценку в одном из мест и запустите синхронизацию повторно. ({self._track_label(song, file_path)})")
 
         # ОТКЛЮЧЕНИЕ СИНХРОНИЗАЦИИ РЕЙТИНГОВ
         if not self.config.get('sync_ratings', True):
