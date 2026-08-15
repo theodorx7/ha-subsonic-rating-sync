@@ -102,7 +102,12 @@ class SyncAgent:
         if w_star:
             parts.append("❤️" if star_val == 1 else "❤️ ➜ 🤍") 
         if w_rate:
-            parts.append("⭐" * rate_val if rate_val > 0 else "⭐️ ➔ ❌")
+            src_str = "⭐" * src_rate if src_rate > 0 else ""
+            if tgt_rate > 0:
+                tgt_str = "⭐" * tgt_rate
+                parts.append(f"{src_str} ➜ {tgt_str}" if src_str else tgt_str)
+            else:
+                parts.append(f"{src_str} ➜ ❌" if src_str else "❌")
         if not parts: return "FALSE"
         return "+".join(parts)
 
@@ -396,8 +401,9 @@ class SyncAgent:
             
             return False, False
 
-        wf_str = self._get_action_str(write_file and w_file_star, write_file and w_file_rate, t_star, t_rate_os)
-        ws_str = self._get_action_str(write_server and w_srv_star, write_server and w_srv_rate, t_star, t_rate_os)
+        f_stars_5 = math.ceil(f_rating_internal / 2) if f_rating_internal else 0
+        wf_str = self._get_action_str(write_file and w_file_star, write_file and w_file_rate, t_star, f_stars_5, t_rate_os)
+        ws_str = self._get_action_str(write_server and w_srv_star, write_server and w_srv_rate, t_star, srv_rating, t_rate_os)
         
         logger.info(
             f"{prefix}ID {song_id} — Update file={wf_str} | Update server={ws_str} — "
