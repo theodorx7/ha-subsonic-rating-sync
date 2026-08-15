@@ -69,7 +69,7 @@ def load_config() -> dict:
         "debug":                bool(raw.get("debug", False)),
     }
 
-def stdin_listener(trigger_event: threading.Event):
+def stdin_listener(trigger_event: threading.Event, sync_running_event: threading.Event):
     """Background thread for reading STDIN (commands from Home Assistant)."""
     stdin_logger = logging.getLogger(__name__)
     for line in sys.stdin:
@@ -83,9 +83,13 @@ def stdin_listener(trigger_event: threading.Event):
                 command = data.strip().lower()
             elif isinstance(data, dict):
                 command = str(data.get("command", "")).strip().lower()
+            
             if command == "run":
-                stdin_logger.info("Sync triggered from Home Assistant.")
-                trigger_event.set()
+                if sync_running_event.is_set():
+                    stdin_logger.warning("Sync command from Home Assistant ignored — sync is already in progress.")
+                else:
+                    stdin_logger.info("Sync triggered by a command from Home Assistant.")
+                    trigger_event.set()
         except json.JSONDecodeError:
             stdin_logger.error(f"Error parsing JSON from STDIN. Received: {line}")
 
@@ -97,7 +101,8 @@ def main() -> None:
     
     # Initialize manual trigger mechanism via STDIN
     manual_trigger = threading.Event()
-    stdin_thread = threading.Thread(target=stdin_listener, args=(manual_trigger,), daemon=True)
+    sync_running = threading.Event()
+    stdin_thread = threading.Thread(target=stdin_listener, args=(manual_trigger, sync_running), daemon=True)
     stdin_thread.start()
     
     if config["debug"]:
@@ -118,6 +123,7 @@ def main() -> None:
 
     while True:
         success = True
+        sync_running.set()
         try:
             agent = SyncAgent(config)
             agent.run_sync()
@@ -125,6 +131,8 @@ def main() -> None:
             success = False
             # Log and PROCEED — transient network errors shouldn't take down the addon or trigger watchdog restarts.
             logger.error("Unexpected error during sync: %s", e, exc_info=True)
+        finally:
+            sync_running.clear()
 
         # MANUAL SYNCHRONIZATION MODE
         if schedule_type == "off":
@@ -169,7 +177,7 @@ def main() -> None:
 
         triggered = manual_trigger.wait(timeout=sleep_seconds)
         if triggered:
-            logger.info("Sync triggered from Home Assistant.")
+            logger.info("Sync triggered by a command from Home Assistant.")
             manual_trigger.clear()
 
 if __name__ == "__main__":
