@@ -360,8 +360,6 @@ class SyncAgent:
         # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (с учетом блокировки режима) ---
         if not write_file and not write_server:
             if not self.config.get('dry_run', False):
-                if is_rating_unresolved:
-                    return False, False
 
                 blocked_by_mode = (w_file_star or w_file_rate or w_srv_star or w_srv_rate)
                 if blocked_by_mode:
