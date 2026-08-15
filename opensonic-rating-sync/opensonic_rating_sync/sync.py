@@ -108,7 +108,7 @@ class SyncAgent:
                 parts.append(f"{src_str} ➜ {tgt_str}" if src_str else tgt_str)
             else:
                 parts.append(f"{src_str} ➜ ❌" if src_str else "❌")
-        if not parts: return "FALSE"
+        if not parts: return "SKIP"
         return "+".join(parts)
 
     def _resolve_lww(self, srv_val, f_val, db_srv_val, db_f_val, srv_mtime, f_mtime):
