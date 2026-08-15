@@ -97,7 +97,7 @@ class SyncAgent:
             return [] 
         return songs
 
-        def _get_action_str(self, w_star, w_rate, star_val, src_rate, tgt_rate):
+    def _get_action_str(self, w_star, w_rate, star_val, src_rate, tgt_rate):
         parts = []
         if w_star:
             parts.append("❤️" if star_val == 1 else "❤️ ➜ 🤍") 
