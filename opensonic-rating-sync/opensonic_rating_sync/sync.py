@@ -63,6 +63,7 @@ class SyncAgent:
                 if u_file: disk_updates += 1
                 if u_server: server_updates += 1
             except RuntimeError:
+                self.conn.cleanup()
                 raise
             except Exception as e:
                 logger.error(f"Error processing track: {self._track_label(song)}: {e}", exc_info=True)
@@ -74,6 +75,8 @@ class SyncAgent:
         logger.info(f"      Tracks updated on SERVER: {server_updates}")
         logger.info(f"      Execution time: {formatted_time}")
 
+        self.conn.cleanup()
+    
     def _fetch_all_server_songs(self):
         songs = []
         mf_id = self.config['music_folder_id']
