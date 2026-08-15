@@ -84,7 +84,7 @@ def stdin_listener(trigger_event: threading.Event):
             elif isinstance(data, dict):
                 command = str(data.get("command", "")).strip().lower()
             if command == "run":
-                stdin_logger.info("Получена команда 'run' из Home Assistant. Прерываю ожидание для запуска синхронизации.")
+                stdin_logger.info("Запущена синхронизация из Home Assistant.")
                 trigger_event.set()
         except json.JSONDecodeError:
             stdin_logger.error(f"Ошибка парсинга JSON из STDIN. Получено: {line}")
@@ -133,7 +133,6 @@ def main() -> None:
             else:
                 logger.info("Sync completed successfully. No next run scheduled — auto-sync disabled.")
 
-            logger.info("Ожидаю ручной запуск через Home Assistant (hassio.addon_stdin)...")
             manual_trigger.wait()
             manual_trigger.clear()
             continue
