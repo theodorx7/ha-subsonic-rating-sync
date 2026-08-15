@@ -6,6 +6,7 @@ from pathlib import Path
 
 import logging
 import sys
+import threading
 from .sync import SyncAgent
 from .database import init_db
 
@@ -68,11 +69,40 @@ def load_config() -> dict:
         "debug":                bool(raw.get("debug", False)),
     }
 
+def stdin_listener(trigger_event: threading.Event):
+    """Background thread for reading STDIN (commands from Home Assistant)."""
+    stdin_logger = logging.getLogger(__name__)
+    try:
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            command = ""
+            try:
+                # HA can send JSON (e.g., {"command": "run"})
+                data = json.loads(line)
+                command = str(data.get("command", "")).strip().lower()
+            except json.JSONDecodeError:
+                # Or plain text ("run")
+                command = line.lower()
+            
+            if command == "run":
+                stdin_logger.info("Получена команда 'run' из Home Assistant. Прерываю ожидание для запуска синхронизации.")
+                trigger_event.set()
+    except Exception as e:
+        stdin_logger.error(f"Ошибка в потоке чтения STDIN: {e}")
+
+
 def main() -> None:
     config = load_config()
     
     setup_logging(config["debug"])
     logger = logging.getLogger(__name__)
+    
+    # Initialize manual trigger mechanism via STDIN
+    manual_trigger = threading.Event()
+    stdin_thread = threading.Thread(target=stdin_listener, args=(manual_trigger,), daemon=True)
+    stdin_thread.start()
     
     if config["debug"]:
         safe = {k: ("***" if k in ("password", "api_key") else v)
@@ -107,8 +137,10 @@ def main() -> None:
             else:
                 logger.info("Sync completed successfully. No next run scheduled — auto-sync disabled.")
 
-            while True:
-                time.sleep(3600)
+            logger.info("Ожидаю ручной запуск через Home Assistant (hassio.addon_stdin)...")
+            manual_trigger.wait()
+            manual_trigger.clear()
+            continue
 
         next_time_str = ""
         sleep_seconds = 0
@@ -140,7 +172,10 @@ def main() -> None:
         else:
             logger.info("Sync completed successfully. Next run: %s", next_time_str)
 
-        time.sleep(sleep_seconds)
+        triggered = manual_trigger.wait(timeout=sleep_seconds)
+        if triggered:
+            logger.info("Sync triggered from Home Assistant. Timer reset.")
+            manual_trigger.clear()
 
 if __name__ == "__main__":
     main()
