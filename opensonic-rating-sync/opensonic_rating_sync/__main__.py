@@ -89,7 +89,6 @@ def stdin_listener(trigger_event: threading.Event):
         except json.JSONDecodeError:
             stdin_logger.error(f"Ошибка парсинга JSON из STDIN. Получено: {line}")
 
-
 def main() -> None:
     config = load_config()
     
