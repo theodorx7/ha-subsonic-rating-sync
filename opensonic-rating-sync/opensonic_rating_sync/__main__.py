@@ -81,6 +81,10 @@ def main() -> None:
     else:
         logger.info("Configuration loaded. Debug mode is off.")
 
+    if not config.get("sync_ratings", True) and not config.get("sync_likes", True):
+        logger.warning("Both rating and like synchronization options are disabled. Update the settings and restart the application.")
+        sys.exit(0) 
+    
     logger.info("Initializing database...")
     init_db()
 
@@ -118,22 +122,18 @@ def main() -> None:
         elif schedule_type == "daily":
             target_time = config["sync_time"]
             now = datetime.datetime.now()
-            try:
-                # Support for "03:00" and "03:00:00" formats
-                fmt = "%H:%M:%S" if len(target_time) == 8 else "%H:%M"
-                target = datetime.datetime.strptime(target_time, fmt).replace(
-                    year=now.year, month=now.month, day=now.day
-                )
-                
-                # If the target time has already passed today, we will reschedule it for tomorrow.
-                if target < now:
-                    target += datetime.timedelta(days=1)
-                
-                sleep_seconds = int((target - now).total_seconds())
-                next_time_str = target.strftime("%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                logger.error("Invalid time format: '%s'. Use HH:MM or HH:MM:SS format. Application exiting.", target_time)
-                raise SystemExit(1)
+            # Support for "03:00" and "03:00:00" formats
+            fmt = "%H:%M:%S" if len(target_time) == 8 else "%H:%M"
+            target = datetime.datetime.strptime(target_time, fmt).replace(
+                year=now.year, month=now.month, day=now.day
+            )
+            
+            # If the target time has already passed today, we will reschedule it for tomorrow.
+            if target < now:
+                target += datetime.timedelta(days=1)
+            
+            sleep_seconds = int((target - now).total_seconds())
+            next_time_str = target.strftime("%Y-%m-%d %H:%M:%S")
 
         if not success:
             logger.warning("⚠️ Sync aborted due to an unexpected error! Next retry: %s", next_time_str)
