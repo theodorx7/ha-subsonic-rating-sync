@@ -78,14 +78,16 @@ def stdin_listener(trigger_event: threading.Event):
             continue
         try:
             data = json.loads(line)
-            command = data.get("command", "").strip().lower()
+            command = ""
+            if isinstance(data, str):
+                command = data.strip().lower()
+            elif isinstance(data, dict):
+                command = str(data.get("command", "")).strip().lower()
             if command == "run":
                 stdin_logger.info("Получена команда 'run' из Home Assistant. Прерываю ожидание для запуска синхронизации.")
                 trigger_event.set()
         except json.JSONDecodeError:
             stdin_logger.error(f"Ошибка парсинга JSON из STDIN. Получено: {line}")
-        except AttributeError:
-            stdin_logger.error(f"Ожидался JSON-объект, получен другой тип данных: {line}")
 
 
 def main() -> None:
