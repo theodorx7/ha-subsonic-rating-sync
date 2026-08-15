@@ -36,6 +36,7 @@ class SyncAgent:
                 raise ConnectionError()
             logger.info(f"Connected to server: {base_url}:{config['server_port']}")
         except Exception as e:
+            self.conn.cleanup()
             logger.error(f"Failed to connect to server: {base_url}:{config['server_port']}")
             raise ConnectionError(f"Server connection failed: {base_url}:{config['server_port']}")
 
