@@ -72,25 +72,20 @@ def load_config() -> dict:
 def stdin_listener(trigger_event: threading.Event):
     """Background thread for reading STDIN (commands from Home Assistant)."""
     stdin_logger = logging.getLogger(__name__)
-    try:
-        for line in sys.stdin:
-            line = line.strip()
-            if not line:
-                continue
-            command = ""
-            try:
-                # HA can send JSON (e.g., {"command": "run"})
-                data = json.loads(line)
-                command = str(data.get("command", "")).strip().lower()
-            except json.JSONDecodeError:
-                # Or plain text ("run")
-                command = line.lower()
-            
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+            command = data.get("command", "").strip().lower()
             if command == "run":
                 stdin_logger.info("Получена команда 'run' из Home Assistant. Прерываю ожидание для запуска синхронизации.")
                 trigger_event.set()
-    except Exception as e:
-        stdin_logger.error(f"Ошибка в потоке чтения STDIN: {e}")
+        except json.JSONDecodeError:
+            stdin_logger.error(f"Ошибка парсинга JSON из STDIN. Получено: {line}")
+        except AttributeError:
+            stdin_logger.error(f"Ожидался JSON-объект, получен другой тип данных: {line}")
 
 
 def main() -> None:
