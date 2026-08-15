@@ -84,10 +84,10 @@ def stdin_listener(trigger_event: threading.Event):
             elif isinstance(data, dict):
                 command = str(data.get("command", "")).strip().lower()
             if command == "run":
-                stdin_logger.info("Запущена синхронизация из Home Assistant.")
+                stdin_logger.info("Sync triggered from Home Assistant.")
                 trigger_event.set()
         except json.JSONDecodeError:
-            stdin_logger.error(f"Ошибка парсинга JSON из STDIN. Получено: {line}")
+            stdin_logger.error(f"Error parsing JSON from STDIN. Received: {line}")
 
 def main() -> None:
     config = load_config()
@@ -169,7 +169,7 @@ def main() -> None:
 
         triggered = manual_trigger.wait(timeout=sleep_seconds)
         if triggered:
-            logger.info("Sync triggered from Home Assistant. Timer reset.")
+            logger.info("Sync triggered from Home Assistant.")
             manual_trigger.clear()
 
 if __name__ == "__main__":
