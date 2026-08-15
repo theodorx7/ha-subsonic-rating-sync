@@ -406,7 +406,7 @@ class SyncAgent:
         ws_str = self._get_action_str(write_server and w_srv_star, write_server and w_srv_rate, t_star, srv_rating, t_rate_os)
         
         logger.info(
-            f"{prefix}ID {song_id} — Update file={wf_str} | Update server={ws_str} — "
+            f"{prefix}ID {song_id} — update FILE={wf_str} | update SERVER={ws_str} — "
             f"({self._track_label(song, file_path)})"
         )
         
