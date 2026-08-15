@@ -1,5 +1,5 @@
 name: "Navidrome Rating Sync"
-version: "1.0.6"
+version: "1.0.0"
 slug: "navidrome-rating-sync"
 description: "Syncing 5-star ratings and favorites (LOVE RATING) between audio files and Navidrome. Supported sync modes: two-way, one-way (Files → Navidrome), or (Navidrome → Files)."
 url: "https://github.com/theodorx7/ha-subsonic-rating-sync"
@@ -44,7 +44,7 @@ schema:
   conflict_resolution: list(server_wins|file_wins)
   sync_schedule_type: list(off|interval|daily)
   sync_interval_hours: int?
-  sync_time: str?
+  sync_time: "match(^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$)?"
   sync_ratings: bool
   sync_likes: bool
   atomic_save: bool
