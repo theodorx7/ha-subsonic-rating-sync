@@ -1,0 +1,61 @@
+configuration:
+  server_protocol:
+    name: Connection protocol
+  server_host:
+    name: Server address
+    description: >-
+      IP address or domain name without http:// and port.
+  server_port:
+    name: Port
+    description: >-
+      Default for Navidrome is 4533. Can be left blank if port 80 or 443 is used.
+  user:
+    name: Username
+    description: >-
+      Specify the account you use to rate tracks. In Navidrome, ratings are tied to a specific user.
+  password:
+    name: Password
+    description: >-
+      Authentication uses a token+salt scheme. The password is not transmitted in plain text.
+  music_folder_id:
+    name: Server library ID
+    description: >-
+      For Navidrome: if there is only one library, it is usually 1. How to find the ID: open the "Libraries" section in the menu —> Open the settings for the desired library —> The number at the end of the URL (e.g., "/#/library/1").
+  sync_mode:
+    name: Sync direction
+    description: >-
+      Two-way synchronization merges data. One-way file-to-server overwrites ratings on the server with data from the files, server-to-file overwrites tags in the files with ratings from the server.
+  conflict_resolution:
+    name: Conflict resolution
+    description: >-
+      Applies only to two-way mode and determines the source priority (server or file) if a rating is changed in both places simultaneously and the modification times match.
+  sync_schedule_type:
+    name: Schedule mode
+    description: >-
+      off — triggered only by a command from Home Assistant, interval — every N hours, daily — every day at a specified time.
+  sync_interval_hours:
+    name: Run interval in hours
+    description: >-
+      Only for interval mode. Minimum 1 hour and only whole numbers without minutes.
+  sync_time:
+    name: Daily run time
+    description: >-
+      Applies only to daily mode. Time format: HH:MM or HH:MM:SS.
+  sync_ratings:
+    name: Sync ratings
+    description: >-
+      Star rating (values from 1 to 5).
+  sync_likes:
+    name: Sync likes
+    description: >-
+      Likes in MusicBee format (binary favorite).
+  dry_run:
+    name: Test sync mode (Dry-Run)
+    description: >-
+      Simulates synchronization without saving data. All planned changes are only output to the log. Use for the first run or to test sync settings.
+  atomic_save:
+    name: Atomic file saving (tag saving)
+    description: >-
+      Protects audio files from corruption during parallel writing by different programs and failures (unstable network/power outage). Recommended for network storage (SMB/NFS). Disabled by default to save SSD lifespan.
+  debug:
+    name: Debug logging
