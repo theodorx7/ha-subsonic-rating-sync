@@ -12,6 +12,28 @@ from .database import init_db
 
 OPTIONS_PATH = Path(os.environ.get("OPTIONS_PATH", "/data/options.json"))
 
+UI_TO_INTERNAL = {
+    "sync_mode": {
+        "Two-way":       "two-way",
+        "File → Server": "file-to-server",
+        "Server → File": "server-to-file",
+    },
+    "conflict_resolution": {
+        "Server wins": "server_wins",
+        "File wins":   "file_wins",
+    },
+    "sync_schedule_type": {
+        "OFF":      "off",
+        "Interval": "interval",
+        "Daily":    "daily",
+    },
+}
+
+def _map(field: str, value: str, default: str) -> str:
+    if value is None:
+        return default
+    return UI_TO_INTERNAL.get(field, {}).get(value, value)
+
 def setup_logging(debug: bool):
     """Initializes the logger for HA App. Output goes to stdout."""
     level = logging.DEBUG if debug else logging.INFO
@@ -57,9 +79,9 @@ def load_config() -> dict:
         "user":                 raw.get("user", ""),
         "password":             raw.get("password", ""),
         "music_folder_id":      raw.get("music_folder_id", ""),
-        "sync_mode":            raw.get("sync_mode", ""),
-        "conflict_resolution":  raw.get("conflict_resolution", ""),
-        "sync_schedule_type":   raw.get("sync_schedule_type", "interval"),
+        "sync_mode":            _map("sync_mode",           raw.get("sync_mode", "two-way"), "two-way"),
+        "conflict_resolution":  _map("conflict_resolution", raw.get("conflict_resolution", "server_wins"), "server_wins"),
+        "sync_schedule_type":   _map("sync_schedule_type",  raw.get("sync_schedule_type", "off"),
         "sync_interval_hours":  int(raw.get("sync_interval_hours") or 0),
         "sync_time":            str(raw.get("sync_time") or "").strip(),
         "dry_run":              bool(raw.get("dry_run", False)),
