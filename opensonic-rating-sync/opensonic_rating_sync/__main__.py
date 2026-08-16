@@ -29,10 +29,9 @@ UI_TO_INTERNAL = {
     },
 }
 
-def _map(field: str, value: str, default: str) -> str:
-    if value is None:
-        return default
-    return UI_TO_INTERNAL.get(field, {}).get(value, value)
+def _map(field: str, value: str) -> str:
+    """Directly maps UI string to internal technical name."""
+    return UI_TO_INTERNAL[field][value]
 
 def setup_logging(debug: bool):
     """Initializes the logger for HA App. Output goes to stdout."""
@@ -73,22 +72,22 @@ def load_config() -> dict:
         raw = json.load(fh)
 
     return {
-        "server_protocol":      raw.get("server_protocol", ""),
+        "server_protocol":      raw["server_protocol"],
         "server_host":          str(raw.get("server_host") or "").strip(),
         "server_port":          int(raw.get("server_port") or 443),
-        "user":                 raw.get("user", ""),
-        "password":             raw.get("password", ""),
-        "music_folder_id":      raw.get("music_folder_id", ""),
-        "sync_mode":            _map("sync_mode",           raw.get("sync_mode", "two-way"), "two-way"),
-        "conflict_resolution":  _map("conflict_resolution", raw.get("conflict_resolution", "server_wins"), "server_wins"),
-        "sync_schedule_type":   _map("sync_schedule_type",  raw.get("sync_schedule_type", "off"),
-        "sync_interval_hours":  int(raw.get("sync_interval_hours") or 0),
+        "user":                 raw["user"],
+        "password":             raw["password"],
+        "music_folder_id":      raw["music_folder_id"],
+        "sync_mode":            _map("sync_mode",            raw["sync_mode"]),
+        "conflict_resolution":  _map("conflict_resolution",  raw["conflict_resolution"]),
+        "sync_schedule_type":   _map("sync_schedule_type",   raw["sync_schedule_type"]),
+        "sync_interval_hours":  int(raw.get("sync_interval_hours") or 1),
         "sync_time":            str(raw.get("sync_time") or "").strip(),
-        "dry_run":              bool(raw.get("dry_run", False)),
-        "sync_ratings":          bool(raw.get("sync_ratings", True)),
-        "sync_likes":            bool(raw.get("sync_likes", True)),
-        "atomic_save":          bool(raw.get("atomic_save", False)),
-        "debug":                bool(raw.get("debug", False)),
+        "dry_run":              bool(raw["dry_run"]),
+        "sync_ratings":         bool(raw["sync_ratings"]),
+        "sync_likes":           bool(raw["sync_likes"]),
+        "atomic_save":          bool(raw["atomic_save"]),
+        "debug":                bool(raw["debug"]),
     }
 
 def stdin_listener(trigger_event: threading.Event, sync_running_event: threading.Event):
