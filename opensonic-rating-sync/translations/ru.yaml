@@ -1,7 +1,6 @@
 configuration:
   server_protocol:
     name: Протокол подключения
-    description:
   server_host:
     name: Адрес сервера
     description: >-
@@ -59,4 +58,4 @@ configuration:
       Гарантирует защиту от порчи файлов при многопользовательском доступе к аудиофайлам или сбоях сети/питания. Рекомендуется, если медиатека доступна по сети (SMB/NFS). Выключено по умолчанию для снижения износа SSD. 
   debug:
     name: Debug логирование
-    description:
+
