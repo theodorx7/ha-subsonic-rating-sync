@@ -25,7 +25,7 @@ options:
   sync_mode: "Two-way"
   conflict_resolution: "Server wins"
   sync_schedule_type: "OFF"
-  sync_interval_hours: 1
+  sync_interval_hours: 5
   sync_time: "04:00:00"
   sync_ratings: true
   sync_likes: true
