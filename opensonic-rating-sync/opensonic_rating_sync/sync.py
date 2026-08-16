@@ -402,13 +402,21 @@ class SyncAgent:
             return False, False
 
         f_stars_5 = math.ceil(f_rating_internal / 2) if f_rating_internal else 0
-        wf_str = self._get_action_str(write_file and w_file_star, write_file and w_file_rate, t_star, f_stars_5, t_rate_os)
-        ws_str = self._get_action_str(write_server and w_srv_star, write_server and w_srv_rate, t_star, srv_rating, t_rate_os)
         
-        logger.info(
-            f"{prefix}ID {song_id} — update FILE={wf_str} | update SERVER={ws_str} — "
-            f"({self._track_label(song, file_path)})"
-        )
+        header_str = f"{prefix}ID {song_id} — "
+        logger.info(f"{header_str}{self._track_label(song, file_path)}")
+        
+        indent = " " * len(header_str)
+        
+        if (write_file and w_file_rate) or (write_server and w_srv_rate):
+            rate_file_str = self._get_action_str(False, write_file and w_file_rate, 0, f_stars_5, t_rate_os)
+            rate_srv_str = self._get_action_str(False, write_server and w_srv_rate, 0, srv_rating, t_rate_os)
+            logger.info(f"{indent}update FILE={rate_file_str} | update SERVER={rate_srv_str}")
+            
+        if (write_file and w_file_star) or (write_server and w_srv_star):
+            like_file_str = self._get_action_str(write_file and w_file_star, False, t_star, 0, 0)
+            like_srv_str = self._get_action_str(write_server and w_srv_star, False, t_star, 0, 0)
+            logger.info(f"{indent}update FILE={like_file_str} | update SERVER={like_srv_str}")
         
         if self.config.get('dry_run', False):
             return write_file, write_server
