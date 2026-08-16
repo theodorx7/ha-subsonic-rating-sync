@@ -1,5 +1,5 @@
 name: "Navidrome Rating Sync"
-version: "1.0.1"
+version: "1.0.0"
 slug: "navidrome-rating-sync"
 description: "Syncing 5-star ratings and favorites (LOVE RATING) between audio files and Navidrome. Supported sync modes: two-way, one-way (Files → Navidrome), or (Navidrome → Files)."
 url: "https://github.com/theodorx7/ha-subsonic-rating-sync"
@@ -22,9 +22,9 @@ options:
   password: "test"
   music_folder_id: "2"  # ID of the Music Library on the Subsonic server 
   dry_run: false
-  sync_mode: "two-way"
-  conflict_resolution: "server_wins"
-  sync_schedule_type: "off"
+  sync_mode: "Two-way"
+  conflict_resolution: "Server wins"
+  sync_schedule_type: "OFF"
   sync_interval_hours: 1
   sync_time: "04:00:00"
   sync_ratings: true
@@ -39,9 +39,9 @@ schema:
   password: password
   music_folder_id: str  # ID of the Music Library on the Subsonic server
   dry_run: bool
-  sync_mode: list(two-way|file-to-server|server-to-file)
-  conflict_resolution: list(server_wins|file_wins)
-  sync_schedule_type: list(off|interval|daily)
+  sync_mode: list(Two-way|File → Server|Server → File)
+  conflict_resolution: list(Server wins|File wins)
+  sync_schedule_type: list(OFF|Interval|Daily)
   sync_interval_hours: int?
   sync_time: "match(^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$)?"
   sync_ratings: bool
