@@ -1,4 +1,4 @@
-[![Hits](https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync.svg?style=for-the-badge)](https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync/)
+[![Hits](https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync.svg?style=for-the-badge&color=555555)](https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync/)
 # Home Assistant App: Navidrome Rating Sync
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
