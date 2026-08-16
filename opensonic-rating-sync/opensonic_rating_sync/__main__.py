@@ -133,7 +133,7 @@ def main() -> None:
     else:
         logger.info("Configuration loaded. Debug mode is off.")
 
-    if not config.get("sync_ratings", True) and not config.get("sync_likes", True):
+    if not config["sync_ratings"] and not config["sync_likes"]:
         logger.warning("Both rating and like synchronization options are disabled. Update the settings and restart the application.")
         sys.exit(0) 
     
