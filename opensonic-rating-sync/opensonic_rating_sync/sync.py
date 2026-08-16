@@ -417,6 +417,7 @@ class SyncAgent:
             like_file_str = self._get_action_str(write_file and w_file_star, False, t_star, 0, 0)
             like_srv_str = self._get_action_str(write_server and w_srv_star, False, t_star, 0, 0)
             logger.info(f"{indent}update FILE={like_file_str} | update SERVER={like_srv_str}")
+        logger.info("")
         
         if self.config.get('dry_run', False):
             return write_file, write_server
