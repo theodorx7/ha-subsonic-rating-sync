@@ -194,7 +194,7 @@ class SyncAgent:
                 logger.warning(f"{header_str}{self._track_label(song, file_path)}")
                 
                 indent = " " * len(header_str)
-                logger.warning(f"{indent}⚠️ Rating conflict: Server={srv_rating}★, File={f_rating_5_scale:g}★ ")
+                logger.warning(f"{indent}⚠️ Rating conflict: Server={srv_rating}★ | File={f_rating_5_scale:g}★ ")
                 
                 logger.warning("Solution: manually change the rating in one of the locations and restart the sync, or temporarily use one-way mode to force overwrite the rating on one of the sides.")
                 logger.warning("")
@@ -422,12 +422,12 @@ class SyncAgent:
         if (write_file and w_file_rate) or (write_server and w_srv_rate):
             rate_file_str = self._get_action_str(False, write_file and w_file_rate, 0, f_stars_5, t_rate_os)
             rate_srv_str = self._get_action_str(False, write_server and w_srv_rate, 0, srv_rating, t_rate_os)
-            logger.info(f"{indent}update: FILE={rate_file_str}  |  SERVER={rate_srv_str}")
+            logger.info(f"{indent}update: FILE={rate_file_str} | SERVER={rate_srv_str}")
             
         if (write_file and w_file_star) or (write_server and w_srv_star):
             like_file_str = self._get_action_str(write_file and w_file_star, False, t_star, 0, 0)
             like_srv_str = self._get_action_str(write_server and w_srv_star, False, t_star, 0, 0)
-            logger.info(f"{indent}update: FILE={like_file_str}  |  SERVER={like_srv_str}")
+            logger.info(f"{indent}update: FILE={like_file_str} | SERVER={like_srv_str}")
         logger.info("")
         
         if self.config.get('dry_run', False):
