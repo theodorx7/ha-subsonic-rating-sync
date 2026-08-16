@@ -72,8 +72,14 @@ class SyncAgent:
         elapsed_time = time.time() - start_time
         formatted_time = time.strftime('%H:%M:%S', time.gmtime(elapsed_time))
 
-        logger.info(f"      Files updated on DISK: {disk_updates}")
-        logger.info(f"      Tracks updated on SERVER: {server_updates}")
+        logger.info("")
+        logger.info("-" * 40)
+        if self.config.get('dry_run', False):
+            logger.info(f"      [DRY-RUN] Planned updates on DISK: {disk_updates}")
+            logger.info(f"      [DRY-RUN] Planned updates on SERVER: {server_updates}")
+        else:
+            logger.info(f"      Files updated on DISK: {disk_updates}")
+            logger.info(f"      Tracks updated on SERVER: {server_updates}")
         logger.info(f"      Execution time: {formatted_time}")
 
         self.conn.cleanup()
@@ -98,18 +104,15 @@ class SyncAgent:
         return songs
 
     def _get_action_str(self, w_star, w_rate, star_val, src_rate, tgt_rate):
-        parts = []
         if w_star:
-            parts.append("❤️" if star_val == 1 else "❤️ ➜ 🤍") 
+            return "❤️" if star_val == 1 else "❤️ ➜ 🤍"
         if w_rate:
             src_str = "⭐" * src_rate if src_rate > 0 else ""
             if tgt_rate > 0:
                 tgt_str = "⭐" * tgt_rate
-                parts.append(f"{src_str} ➜ {tgt_str}" if src_str else tgt_str)
-            else:
-                parts.append(f"{src_str} ➜ ❌" if src_str else "❌")
-        if not parts: return "SKIP"
-        return "+".join(parts)
+                return f"{src_str} ➜ {tgt_str}" if src_str else tgt_str
+            return f"{src_str} ➜ ❌" if src_str else "❌"
+        return "skip"
 
     def _resolve_lww(self, srv_val, f_val, db_srv_val, db_f_val, srv_mtime, f_mtime):
         """Архитектура Last-Write-Wins. Возвращает 'server', 'file' или 'none'."""
@@ -411,12 +414,12 @@ class SyncAgent:
         if (write_file and w_file_rate) or (write_server and w_srv_rate):
             rate_file_str = self._get_action_str(False, write_file and w_file_rate, 0, f_stars_5, t_rate_os)
             rate_srv_str = self._get_action_str(False, write_server and w_srv_rate, 0, srv_rating, t_rate_os)
-            logger.info(f"{indent}update FILE={rate_file_str} | update SERVER={rate_srv_str}")
+            logger.info(f"{indent}update: FILE={rate_file_str}  |  SERVER={rate_srv_str}")
             
         if (write_file and w_file_star) or (write_server and w_srv_star):
             like_file_str = self._get_action_str(write_file and w_file_star, False, t_star, 0, 0)
             like_srv_str = self._get_action_str(write_server and w_srv_star, False, t_star, 0, 0)
-            logger.info(f"{indent}update FILE={like_file_str} | update SERVER={like_srv_str}")
+            logger.info(f"{indent}update: FILE={like_file_str}  |  SERVER={like_srv_str}")
         logger.info("")
         
         if self.config.get('dry_run', False):
