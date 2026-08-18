@@ -151,14 +151,14 @@ def main() -> None:
         except Exception as e:
             success = False
             # Log and PROCEED — transient network errors shouldn't take down the addon or trigger watchdog restarts.
-            logger.error("Unexpected error during sync: %s", e, exc_info=True)
+            logger.error("Synchronization error: %s", e, exc_info=True)
         finally:
             sync_running.clear()
 
         # MANUAL SYNCHRONIZATION MODE
         if schedule_type == "off":
             if not success:
-                logger.error("Unexpected error during sync. No next run scheduled — auto-sync disabled.")
+                logger.error("Sync failed due to an error. No next run scheduled — auto-sync disabled.")
             else:
                 logger.info("Sync completed successfully. No next run scheduled — auto-sync disabled.")
 
