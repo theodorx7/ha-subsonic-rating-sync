@@ -2,11 +2,6 @@
   <a href=".github/DONATE.md"><img src="https://img.shields.io/badge/USDT-26A17B?style=for-the-badge&logo=tether&logoColor=white" alt="USDT TRC20"></a>
   <a href="https://boosty.to/fedorx/donate"><img src="https://img.shields.io/static/v1?label=BOOSTY&message=DONATE&color=8b8b8b&labelColor=ef7729&logo=boosty&style=for-the-badge&logoColor=white" alt="Boosty"></a>
 </div>
-</p>
-
-<a href="https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync/">
-  <img align="right" alt="Hits" src="https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync.svg?style=for-the-badge&color=555555">
-</a>
 
 # Home Assistant App: Navidrome Rating Sync
 ![Supports aarch64 Architecture][aarch64-shield]
@@ -21,3 +16,7 @@ Syncing 5-star ratings and favorites (LOVE RATING) between audio files and Navid
 Supported sync modes: 
   - Two-way (merge)
   - One-way (files → Navidrome) or (Navidrome → files)
+
+ <a href="https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync/">
+  <img align="right" alt="Hits" src="https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync.svg?style=for-the-badge&color=555555">
+</a>
