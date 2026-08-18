@@ -198,7 +198,6 @@ def main() -> None:
 
         triggered = manual_trigger.wait(timeout=sleep_seconds)
         if triggered:
-            logger.info("Sync triggered by a command from Home Assistant.")
             manual_trigger.clear()
 
 if __name__ == "__main__":
