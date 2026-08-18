@@ -15,16 +15,16 @@ map:
   - share:rw
 
 options:
-  server_protocol: "https"
-  server_host: "musicfx.duckdns.org"
+  server_protocol: null
+  server_host: null
   server_port: 4533
-  user: "test"
-  password: "test"
-  music_folder_id: "2"  # ID of the Music Library on the Subsonic server 
+  user: null
+  password: null
+  music_folder_id: null  # ID of the Music Library on the Subsonic server 
   dry_run: false
-  sync_mode: "Two-way"
-  conflict_resolution: "Server wins"
-  sync_schedule_type: "OFF"
+  sync_mode: null
+  conflict_resolution: null
+  sync_schedule_type: null
   sync_interval_hours: 5
   sync_time: "04:00:00"
   sync_ratings: true
