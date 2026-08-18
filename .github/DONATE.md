@@ -4,7 +4,7 @@
 
 <img src="USDT_TRC20_TXJtXSaQYNqqMGTf5aSHV3Q7ca26sZqsG3.jpg" alt="USDT QR Code" width="220">
 
-<br><br>
+<br>
 <p>USDT TRC-20:</p>
 
 </div>
