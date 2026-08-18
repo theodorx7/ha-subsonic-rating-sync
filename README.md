@@ -1,3 +1,6 @@
+[![Donate.Stream](https://img.shields.io/badge/Donate.Stream-blue?style=for-the-badge)](https://donate.stream/donate_6a8404d5ea133)
+[![Boosty](https://img.shields.io/badge/Boosty-donate-F88837?logo=boosty&style=for-the-badge&logoColor=white)](https://boosty.to/fedorx/donate)
+
 <a href="https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync/">
   <img align="right" alt="Hits" src="https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync.svg?style=for-the-badge&color=555555">
 </a>
