@@ -6,10 +6,6 @@
 
 <h2 align="left">Home Assistant App: Navidrome Rating Sync</h2>
 
-<div align="right">
-  <a href="https://boosty.to/fedorx/donate"><img src="https://img.shields.io/static/v1?label=BOOSTY&message=DONATE&color=8b8b8b&labelColor=ef7729&logo=boosty&style=for-the-badge&logoColor=white" alt="Boosty"></a>&thinsp;<a href=".github/DONATE.md"><img src="https://img.shields.io/badge/USDT-26A17B?style=for-the-badge&logo=tether&logoColor=white" alt="USDT TRC20"></a>
-</div>
-
 ## The app is under active development and currently non-functional. Keep an eye out for updates on the full public release.
 
 Syncing 5-star ratings and favorites (LOVE RATING) between audio files and Navidrome (Subsonic/Opensonic API).  
