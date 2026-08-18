@@ -2,7 +2,7 @@
 
 <h2>Support the project</h2>
 
-[![USDT TRC20](https://img.shields.io/badge/USDT_TRC20-TXJtXSaQYNqqMGTf5aSHV3Q7ca26sZqsG3?style=flat&logo=tether&logoColor=white&labelColor=26A17B&color=26A17B)](https://tronscan.org/#/address/TXJtXSaQYNqqMGTf5aSHV3Q7ca26sZqsG3)
+[![USDT TRC20](https://img.shields.io/badge/USDT-TRC20-EB0029?style=for-the-badge&logo=tether&logoColor=whiteB)](https://tronscan.org/#/address/TXJtXSaQYNqqMGTf5aSHV3Q7ca26sZqsG3)
 <br>
 
 <img src="USDT_TRC20_TXJtXSaQYNqqMGTf5aSHV3Q7ca26sZqsG3.jpg" alt="USDT QR Code" width="220">
