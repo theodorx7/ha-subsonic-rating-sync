@@ -23,7 +23,7 @@ options:
   music_folder_id: "2"  # ID of the Music Library on the Subsonic server 
   dry_run: false
   sync_mode: "Two-way"
-  conflict_resolution: "Server_wins"
+  conflict_resolution: "Server wins"
   sync_schedule_type: "OFF"
   sync_interval_hours: 1
   sync_time: "04:00:00"
