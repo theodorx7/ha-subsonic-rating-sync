@@ -7,7 +7,5 @@
 <br>
 <p>USDT TRC20</p>
 
-</div>
-
 ```text
 TXJtXSaQYNqqMGTf5aSHV3Q7ca26sZqsG3
