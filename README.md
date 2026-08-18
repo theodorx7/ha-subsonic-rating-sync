@@ -1,8 +1,22 @@
 <div align="right">
-  <a href="https://donate.stream/donate_6a8404d5ea133"><img src="https://img.shields.io/static/v1?label=&message=Donate.Stream&color=fc0&style=for-the-badge" alt="Donate.Stream"></a>
-  <a href="https://boosty.to/fedorx/donate"><img src="https://img.shields.io/static/v1?label=&message=Boosty&color=ef7729&logo=boosty&style=for-the-badge&logoColor=white" alt="Boosty"></a>
+  <a href="https://boosty.to/fedorx/donate">
+    <img src="https://img.shields.io/static/v1?label=BOOSTY&message=DONATE&color=8b8b8b&labelColor=ef7729&logo=boosty&style=for-the-badge&logoColor=white" alt="Boosty">
+  </a>
+  <br>
+  <details>
+    <summary>
+      <!-- Пустой тег <a> отключает открытие картинки GitHub-просмотрщиком -->
+      <a name="disable-lightbox"><img src="https://img.shields.io/static/v1?label=USDT&message=TRC20&logo=tether&labelColor=26A17B&color=8b8b8b&style=for-the-badge&logoColor=white" alt="USDT TRC20"></a>
+    </summary>
+    <div align="right">
+      <br>
+      <img src="https://raw.githubusercontent.com/theodorx7/ha-subsonic-rating-sync/main/.github/USDT_TRC20_TXJtXSaQYNqqMGTf5aSHV3Q7ca26sZqsG3.jpg" alt="USDT QR Code" width="180">
+      <br>
+      <code>TXJtXSaQYNqqMGTf5aSHV3Q7ca26sZqsG3</code>
+    </div>
+  </details>
 </div>
-</p>
+
 <a href="https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync/">
   <img align="right" alt="Hits" src="https://hits.sh/github.com/theodorx7/ha-subsonic-rating-sync.svg?style=for-the-badge&color=555555">
 </a>
