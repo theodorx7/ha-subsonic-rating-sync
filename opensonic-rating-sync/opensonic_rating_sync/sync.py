@@ -72,7 +72,6 @@ class SyncAgent:
         elapsed_time = time.time() - start_time
         formatted_time = time.strftime('%H:%M:%S', time.gmtime(elapsed_time))
 
-        logger.info("")
         logger.info("-" * 40)
         if self.config.get('dry_run', False):
             logger.info(f"      [DRY-RUN] Planned updates on DISK: {disk_updates}")
