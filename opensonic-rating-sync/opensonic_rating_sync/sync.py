@@ -196,7 +196,6 @@ class SyncAgent:
                 logger.warning(f"{indent}⚠️ Rating conflict: Server={srv_rating}★ | File={f_rating_5_scale:g}★ ")
                 
                 logger.warning("Solution: manually change the rating in one of the locations and restart the sync, or temporarily use one-way mode to force overwrite the rating on one of the sides.")
-                logger.warning("")
         
         if not self.config.get('sync_ratings', True):
             w_file_rate, w_srv_rate = False, False
