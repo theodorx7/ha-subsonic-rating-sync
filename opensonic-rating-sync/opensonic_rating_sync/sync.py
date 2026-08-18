@@ -190,12 +190,13 @@ class SyncAgent:
                 is_rating_unresolved = True
                 
                 header_str = f"{prefix}ID {song_id} — "
+                logger.warning(f"{header_str}{self._track_label(song, file_path)}")
+                
                 indent = " " * len(header_str)
-                logger.warning(
-                    f"{header_str}{self._track_label(song, file_path)}\n"
-                    f"{indent}⚠️ Rating conflict: Server={srv_rating}★ | File={f_rating_5_scale:g}★ \n"
-                    f"Solution: manually change the rating in one of the locations and restart the sync, or temporarily use one-way mode to force overwrite the rating on one of the sides.\n"
-                )
+                logger.warning(f"{indent}⚠️ Rating conflict: Server={srv_rating}★ | File={f_rating_5_scale:g}★ ")
+                
+                logger.warning("Solution: manually change the rating in one of the locations and restart the sync, or temporarily use one-way mode to force overwrite the rating on one of the sides.")
+                logger.warning("")
         
         if not self.config.get('sync_ratings', True):
             w_file_rate, w_srv_rate = False, False
