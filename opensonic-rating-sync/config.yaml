@@ -30,7 +30,7 @@ options:
   sync_ratings: true
   sync_likes: true
   atomic_save: false
-  debug: true
+  debug: false
 schema:
   server_protocol: list(https|http)
   server_host: str
