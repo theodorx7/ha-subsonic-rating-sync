@@ -191,14 +191,13 @@ class SyncAgent:
                 is_rating_unresolved = True
                 
                 header_str = f"{prefix}ID {song_id} — "
-                logger.warning(f"{header_str}{self._track_label(song, file_path)}")
-                
                 indent = " " * len(header_str)
-                logger.warning(f"{indent}⚠️ Rating conflict: Server={srv_rating}★ | File={f_rating_5_scale:g}★ ")
-                
-                logger.warning("Solution: manually change the rating in one of the locations and restart the sync, or temporarily use one-way mode to force overwrite the rating on one of the sides.")
-                logger.warning("")
-
+                logger.warning(
+                    f"{header_str}{self._track_label(song, file_path)}\n"
+                    f"{indent}⚠️ Rating conflict: Server={srv_rating}★ | File={f_rating_5_scale:g}★ \n"
+                    f"Solution: manually change the rating in one of the locations and restart the sync, or temporarily use one-way mode to force overwrite the rating on one of the sides.\n"
+                )
+        
         if not self.config.get('sync_ratings', True):
             w_file_rate, w_srv_rate = False, False
             t_rate_os = srv_rating
@@ -324,10 +323,8 @@ class SyncAgent:
         if os.path.isabs(raw_path):
             file_path = raw_path
         else:
-            logger.error(
-                "Received relative path from server. Enable absolute paths on the server for client 'Rating Sync Agent [Python]'.\n"
-                "If you are using Navidrome: in the menu, open the 'Players' section ---> Find and open the client settings named 'Rating Sync Agent [Python]' ---> Enable the 'Report Real Path' option ---> Click SAVE"
-            )
+            logger.error("Received relative path from server. Enable absolute paths on the server for client 'Rating Sync Agent [Python]'.")
+            logger.error("If you are using Navidrome: in the menu, open the 'Players' section ---> Find and open the client settings named 'Rating Sync Agent [Python]' ---> Enable the 'Report Real Path' option ---> Click SAVE")
             raise RuntimeError("Server returns relative paths instead of absolute.")
     
         # Один вызов os.stat вместо os.path.exists + os.stat для I/O оптимизации.
