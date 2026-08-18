@@ -4,7 +4,8 @@
   <a href=".github/DONATE.md"><img src="https://img.shields.io/badge/USDT-26A17B?style=for-the-badge&logo=tether&logoColor=white" alt="USDT TRC20"></a>
 </div>
 
-# Home Assistant App: Navidrome Rating Sync
+<h2><b>Home Assistant App: Navidrome Rating Sync</b></h2>
+
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
 
