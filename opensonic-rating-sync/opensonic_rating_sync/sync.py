@@ -3,7 +3,6 @@ import logging
 import math
 import time
 import datetime
-from urllib.parse import unquote
 from .database import get_track_state, upsert_track_state
 from . import ratings
 import libopensonic
@@ -327,7 +326,7 @@ class SyncAgent:
             logger.error(f"Track {song_id} | {self._track_label(song)} has no attribute 'path'. Skip.")
             return False, False
     
-        raw_path = unquote(song_path)
+        raw_path = song_path
         if os.path.isabs(raw_path):
             file_path = raw_path
         else:
