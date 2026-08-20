@@ -81,7 +81,7 @@ class SyncAgent:
         formatted_time = time.strftime('%H:%M:%S', time.gmtime(elapsed_time))
 
         logger.info("-" * 40)
-        if self.config.get('dry_run', False):
+        if self.config['dry_run']:
             logger.info(f"      [DRY-RUN] Planned updates on DISK: {disk_updates}")
             logger.info(f"      [DRY-RUN] Planned updates on SERVER: {server_updates}")
         else:
@@ -137,10 +137,10 @@ class SyncAgent:
         if f_mtime == 0 and srv_mtime == 0: return 'unresolved', 0
         if f_mtime > srv_mtime: return 'file', f_mtime
         if srv_mtime > f_mtime: return 'server', srv_mtime
-        return 'server' if self.config.get('conflict_resolution', 'server_wins') == 'server_wins' else 'file', max(srv_mtime, f_mtime)
+        return 'server' if self.config['conflict_resolution'] == 'server_wins' else 'file', max(srv_mtime, f_mtime)
 
     def _resolve_rating_conflict(self, song_id, song, file_path, f_rating_internal, srv_rating, db_state, is_new_file, now_time):
-        prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
+        prefix = "[DRY-RUN] " if self.config['dry_run'] else ""
         f_rating_5_scale = f_rating_internal / 2.0
         is_rating_unresolved = False
         
@@ -205,7 +205,7 @@ class SyncAgent:
                 
                 logger.warning("Solution: manually change the rating in one of the locations and restart the sync, or temporarily use one-way mode to force overwrite the rating on one of the sides.")
         
-        if not self.config.get('sync_ratings', True):
+        if not self.config['sync_ratings']:
             w_file_rate, w_srv_rate = False, False
             t_rate_os = srv_rating
             t_rate_internal = f_rating_internal
@@ -249,7 +249,7 @@ class SyncAgent:
             w_file_star, w_srv_star = False, False
             final_f_star_mtime, final_s_star_mtime = new_f_star_mtime, new_s_star_mtime
 
-        if not self.config.get('sync_likes', True):
+        if not self.config['sync_likes']:
             w_file_star, w_srv_star = False, False
             t_star = srv_starred
             final_f_star_mtime = db_state['file_starred_mtime']
@@ -264,8 +264,8 @@ class SyncAgent:
                     final_f_rate_mtime, final_s_rate_mtime, final_f_star_mtime, final_s_star_mtime,
                     current_mtime, song_id, file_path):
         
-        sync_ratings = self.config.get('sync_ratings', True)
-        sync_likes = self.config.get('sync_likes', True)
+        sync_ratings = self.config['sync_ratings']
+        sync_likes = self.config['sync_likes']
         
         if w_file_rate:
             actual_f_rate_mtime = final_f_rate_mtime if actual_f_rate_write else db_state['file_rating_mtime']
@@ -351,8 +351,8 @@ class SyncAgent:
         if current_mtime != db_state['file_mtime_ns'] or db_state['file_mtime_ns'] == 0:
             f_rating_internal, f_starred = ratings.get_all_ratings_from_file(
                 file_path, 
-                self.config.get('sync_ratings', True), 
-                self.config.get('sync_likes', True)
+                self.config['sync_ratings'], 
+                self.config['sync_likes']
             )
             logger.debug(f"READ FROM FILE: {os.path.basename(file_path)} -> rating={f_rating_internal}, starred={f_starred}")
         else:
@@ -368,7 +368,7 @@ class SyncAgent:
         
         # --- ЛОГИКА LWW (LAST-WRITE-WINS) ---
         now_time = time.time()
-        prefix = "[DRY-RUN] " if self.config.get('dry_run', False) else ""
+        prefix = "[DRY-RUN] " if self.config['dry_run'] else ""
         
         # 1. РЕЙТИНГ
         t_rate_os, t_rate_internal, w_file_rate, w_srv_rate, final_f_rate_mtime, final_s_rate_mtime, is_rating_unresolved = \
@@ -383,7 +383,7 @@ class SyncAgent:
         
         # --- БЛОК "НЕТ ИЗМЕНЕНИЙ" (с учетом блокировки режима) ---
         if not write_file and not write_server:
-            if not self.config.get('dry_run', False):
+            if not self.config['dry_run']:
 
                 blocked_by_mode = (w_file_star or w_file_rate or w_srv_star or w_srv_rate)
                 if blocked_by_mode:
@@ -399,10 +399,10 @@ class SyncAgent:
                     final_s_rate = t_rate_os
 
                 # ОТКЛЮЧЕНИЕ СИНХРОНИЗАЦИИ (СОХРАНЕНИЕ ДАННЫХ В БД)
-                if not self.config.get('sync_ratings', True):
+                if not self.config['sync_ratings']:
                     final_f_rate = db_state['file_rating']
                     final_s_rate = db_state['server_rating']
-                if not self.config.get('sync_likes', True):
+                if not self.config['sync_likes']:
                     final_f_star = db_state['file_starred']
                     final_s_star = db_state['server_starred']
 
@@ -449,7 +449,7 @@ class SyncAgent:
                 s_val = bool(t_star) if w_file_star else None
                 
                 # ИЗМЕНЕНИЕ: Получаем кортеж статусов записи (рейтинг, лайк) от ratings.py
-                r_status, s_status = ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val, atomic_save=self.config.get("atomic_save", False))
+                r_status, s_status = ratings.set_tags_to_file(file_path, rating=r_val, starred=s_val, atomic_save=self.config['atomic_save'])
                 
                 # ИЗМЕНЕНИЕ: Обновляем раздельные флаги только при успешной записи конкретного поля
                 if r_status: actual_f_rate_write = True
