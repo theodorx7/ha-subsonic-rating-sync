@@ -57,8 +57,17 @@ class SyncAgent:
         
         disk_updates = 0
         server_updates = 0
+        processed_count = 0
+        total_tracks = len(server_songs)
+        
+        if total_tracks > 0:
+            logger.info(f"Sync is running. Scanning and processing {total_tracks} tracks...")
         
         for song in server_songs:
+            processed_count += 1
+            if processed_count % 1000 == 0 and processed_count != total_tracks:
+                logger.info(f"Progress: {processed_count} / {total_tracks} tracks scanned...")
+            
             try:
                 u_file, u_server = self._process_song(song)
                 if u_file: disk_updates += 1
