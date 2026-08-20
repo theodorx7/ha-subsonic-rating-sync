@@ -315,7 +315,7 @@ class SyncAgent:
     
         song_path = song.path
         if not song_path:
-            logger.warning(f"Track {song_id} | {self._track_label(song)} has no attribute 'path'. Skip.")
+            logger.error(f"Track {song_id} | {self._track_label(song)} has no attribute 'path'. Skip.")
             return False, False
     
         raw_path = unquote(song_path)
@@ -330,7 +330,7 @@ class SyncAgent:
         try:
             current_mtime = os.stat(file_path).st_mtime_ns
         except FileNotFoundError:
-            logger.warning(f"File not found on disk:: {file_path} (Track on server: {self._track_label(song)})")
+            logger.error(f"File not found on disk: {file_path} (Track on server: {self._track_label(song)})")
             return False, False
 
         db_state = get_track_state(song_id) or {
