@@ -29,11 +29,11 @@ _LIKE_VALUE_BAN = "B"
 
 # --- BASE STRATEGY CLASS ---
 class RatingHandler:
-    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True): raise NotImplementedError
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple: raise NotImplementedError
+    def read_all(self, file_path: str, sync_ratings: bool, sync_likes: bool): raise NotImplementedError
+    def write_tags(self, file_path: str, rating: int | None, starred: bool | None, atomic_save: bool) -> tuple: raise NotImplementedError
     def _load(self, file_path: str): raise NotImplementedError
 
-    def _safe_save(self, audio, file_path: str, atomic_save: bool = False):
+    def _safe_save(self, audio, file_path: str, atomic_save: bool):
         if atomic_save:
             # --- ATOMIC MODE (Copy-Save-Replace) ---
             # 100% protection against binary corruption during race conditions and power failures (for SMB/network).
@@ -92,7 +92,7 @@ def _internal_rating_to_popm(internal_rating):
 # --- ID3 STRATEGIES (MP3 / AIFF /WAV ) ---
 class ID3Handler(RatingHandler):
     # Read rating and like at once
-    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
+    def read_all(self, file_path: str, sync_ratings: bool, sync_likes: bool):
         try:
             # PROTECTION: If the file has no tags at all, initialize an empty dictionary
             audio = self._load(file_path)
@@ -136,7 +136,7 @@ class ID3Handler(RatingHandler):
         except Exception as e: logger.error(f"ID3 read all err ({file_path}): {e}")
         return None, 0
 
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
+    def write_tags(self, file_path: str, rating: int | None, starred: bool | None, atomic_save: bool) -> tuple:
         audio = self._load(file_path)
         if audio is None: return None, None
         if audio.tags is None: audio.tags = ID3()
@@ -202,7 +202,7 @@ class WAVHandler(ID3Handler):
 # --- XIPH STRATEGIES (FLAC, OGG, OPUS, APE, WavPack) ---
 class XiphHandler(RatingHandler):
     # Read rating and like at once
-    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
+    def read_all(self, file_path: str, sync_ratings: bool, sync_likes: bool):
         try:
             audio = self._load(file_path)
             if not audio or not audio.tags:
@@ -239,7 +239,7 @@ class XiphHandler(RatingHandler):
         except Exception as e: logger.error(f"Xiph read all err ({file_path}): {e}")
         return None, 0
 
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
+    def write_tags(self, file_path: str, rating: int | None, starred: bool | None, atomic_save: bool) -> tuple:
         audio = self._load(file_path)
         if audio:
             if audio.tags is None:
@@ -290,7 +290,7 @@ class XiphHandler(RatingHandler):
 # --- MP4 STRATEGIES (M4A / AAC) ---
 class MP4Handler(RatingHandler):
     # Read rating and like at once
-    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
+    def read_all(self, file_path: str, sync_ratings: bool, sync_likes: bool):
         try:
             audio = self._load(file_path)
             if not audio or not audio.tags:
@@ -323,7 +323,7 @@ class MP4Handler(RatingHandler):
         except Exception as e: logger.error(f"MP4 read all err ({file_path}): {e}")
         return None, 0
     
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
+    def write_tags(self, file_path: str, rating: int | None, starred: bool | None, atomic_save: bool) -> tuple:
         audio = self._load(file_path)
         if audio is None: return None, None
         if audio.tags is None: audio.add_tags()
@@ -374,7 +374,7 @@ class MP4Handler(RatingHandler):
 # --- WMA STRATEGIES (Windows Media Audio / ASF) ---
 class ASFHandler(RatingHandler):
     # Read rating and like at once
-    def read_all(self, file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
+    def read_all(self, file_path: str, sync_ratings: bool, sync_likes: bool):
         try:
             audio = self._load(file_path)
             if not audio or not audio.tags:
@@ -407,7 +407,7 @@ class ASFHandler(RatingHandler):
         except Exception as e: logger.error(f"ASF read all err ({file_path}): {e}")
         return None, 0
     
-    def write_tags(self, file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
+    def write_tags(self, file_path: str, rating: int | None, starred: bool | None, atomic_save: bool) -> tuple:
         audio = self._load(file_path)
         if audio is None: return None, None
         if audio.tags is None: audio.add_tags()
@@ -465,12 +465,12 @@ def get_handler(file_path: str) -> RatingHandler | None:
     ext = os.path.splitext(file_path)[1].lower()
     return HANDLER_REGISTRY.get(ext)
 
-def set_tags_to_file(file_path: str, rating: int | None = None, starred: bool | None = None, atomic_save: bool = False) -> tuple:
+def set_tags_to_file(file_path: str, rating: int | None, starred: bool | None, atomic_save: bool) -> tuple:
     handler = get_handler(file_path)
     if handler: 
         return handler.write_tags(file_path, rating, starred, atomic_save)
     return None, None
 
-def get_all_ratings_from_file(file_path: str, sync_ratings: bool = True, sync_likes: bool = True):
+def get_all_ratings_from_file(file_path: str, sync_ratings: bool, sync_likes: bool):
     handler = get_handler(file_path)
     return handler.read_all(file_path, sync_ratings, sync_likes) if handler else (None, 0)
