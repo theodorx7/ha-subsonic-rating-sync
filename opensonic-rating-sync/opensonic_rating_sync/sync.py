@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class SyncAgent:
     def __init__(self, config):
         self.config = config
-        self.sync_mode = config.get('sync_mode', 'two-way')
+        self.sync_mode = config['sync_mode']
         
         host = config['server_host'].strip().lower()
         if host.startswith('https://'):
