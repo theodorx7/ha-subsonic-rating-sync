@@ -107,7 +107,7 @@ def stdin_listener(trigger_event: threading.Event, sync_running_event: threading
             
             if command == "run":
                 if sync_running_event.is_set():
-                    stdin_logger.warning("Sync command from Home Assistant ignored — sync is already in progress.")
+                    stdin_logger.warning("Command to start sync from Home Assistant ignored — sync is already in progress.")
                 else:
                     stdin_logger.info("Sync triggered by a command from Home Assistant.")
                     trigger_event.set()
